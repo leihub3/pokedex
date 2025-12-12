@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import Link from "next/link";
 import { useTeamStore } from "@/store/teamStore";
 import { TeamStatsChart } from "@/components/charts/TeamStatsChart";
-import { getPokemonById } from "@/lib/api/pokemon";
+import { TeamSlot } from "./TeamSlot";
+import { TypeWeaknessSummary } from "./TypeWeaknessSummary";
+import { TeamRecommendations } from "./TeamRecommendations";
+import { getPokemonById, getAllPokemonList } from "@/lib/api/pokemon";
 import { LoaderSpinner } from "@/components/ui/LoaderSpinner";
 import type { Pokemon } from "@/types/api";
 
@@ -15,11 +17,13 @@ export function TeamBuilderClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Pokemon[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setIsSearching(true);
     try {
+      // Try to search by name or ID
       const pokemon = await getPokemonById(searchQuery.toLowerCase());
       setSearchResults([pokemon]);
     } catch (error) {
@@ -30,10 +34,20 @@ export function TeamBuilderClient() {
     }
   };
 
-  const addPokemonToSlot = (pokemon: Pokemon, slot: number) => {
+  const handleDrop = (pokemon: Pokemon, slot: number) => {
     addToTeam(pokemon, slot);
-    setSearchQuery("");
-    setSearchResults([]);
+  };
+
+  const handleDragStart = (slot: number) => {
+    setDraggingSlot(slot);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingSlot(null);
+  };
+
+  const handleSlotDragEnd = () => {
+    handleDragEnd();
   };
 
   const teamPokemon = team.filter((p): p is Pokemon => p !== null);
@@ -62,26 +76,45 @@ export function TeamBuilderClient() {
       {/* Search Results */}
       {searchResults.length > 0 && (
         <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-800">
-          <h3 className="mb-2 font-semibold">Search Results</h3>
+          <h3 className="mb-2 font-semibold text-gray-900 dark:text-gray-100">
+            Search Results
+          </h3>
           <div className="space-y-2">
             {searchResults.map((pokemon) => (
-              <div
+              <motion.div
                 key={pokemon.id}
-                className="flex items-center justify-between rounded border border-gray-200 p-2 dark:border-gray-700"
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData(
+                    "application/json",
+                    JSON.stringify(pokemon)
+                  );
+                }}
+                whileHover={{ scale: 1.02 }}
+                className="flex cursor-move items-center justify-between rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900"
               >
-                <span className="capitalize">{pokemon.name}</span>
-                <div className="flex gap-2">
-                  {team.map((_, slot) => (
-                    <button
-                      key={slot}
-                      onClick={() => addPokemonToSlot(pokemon, slot)}
-                      className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
-                    >
-                      Slot {slot + 1}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-3">
+                  {pokemon.sprites.front_default && (
+                    <img
+                      src={pokemon.sprites.front_default}
+                      alt={pokemon.name}
+                      className="h-12 w-12 object-contain"
+                    />
+                  )}
+                  <div>
+                    <p className="font-semibold capitalize text-gray-900 dark:text-gray-100">
+                      {pokemon.name}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      #{String(pokemon.id).padStart(3, "0")}
+                    </p>
+                  </div>
                 </div>
-              </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Drag to slot
+                </p>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -91,7 +124,7 @@ export function TeamBuilderClient() {
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            Your Team
+            Your Team ({teamPokemon.length}/6)
           </h2>
           <button
             onClick={clearTeam}
@@ -102,46 +135,33 @@ export function TeamBuilderClient() {
         </div>
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
           {team.map((pokemon, slot) => (
-            <div
+            <TeamSlot
               key={slot}
-              className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
-            >
-              {pokemon ? (
-                <div>
-                  <Link href={`/pokemon/${pokemon.id}`}>
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      className="cursor-pointer text-center"
-                    >
-                      <p className="font-semibold capitalize text-gray-900 dark:text-gray-100">
-                        {pokemon.name}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        #{String(pokemon.id).padStart(3, "0")}
-                      </p>
-                    </motion.div>
-                  </Link>
-                  <button
-                    onClick={() => removeFromTeam(slot)}
-                    className="mt-2 w-full rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ) : (
-                <p className="text-center text-sm text-gray-500 dark:text-gray-500">
-                  Slot {slot + 1}
-                </p>
-              )}
-            </div>
+              pokemon={pokemon}
+              slot={slot}
+              onRemove={() => removeFromTeam(slot)}
+              onDrop={(p) => handleDrop(p, slot)}
+              isDragging={draggingSlot === slot}
+              onDragStart={handleDragStart}
+              onDragEnd={handleSlotDragEnd}
+            />
           ))}
         </div>
       </div>
 
-      {/* Team Stats */}
+      {/* Team Analysis */}
       {teamPokemon.length > 0 && (
-        <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-800">
-          <TeamStatsChart team={teamPokemon} />
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Team Stats */}
+          <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-800">
+            <TeamStatsChart team={teamPokemon} />
+          </div>
+
+          {/* Type Analysis */}
+          <div className="space-y-6 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-800">
+            <TypeWeaknessSummary team={teamPokemon} />
+            <TeamRecommendations team={teamPokemon} />
+          </div>
         </div>
       )}
     </div>

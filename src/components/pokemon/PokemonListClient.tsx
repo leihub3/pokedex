@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { getPokemonList, getPokemonById, getAllPokemonList } from "@/lib/api/pokemon";
 import { usePokemonStore } from "@/store/pokemonStore";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
@@ -41,7 +41,7 @@ export function PokemonListClient({ initialData }: PokemonListClientProps) {
   const [initialLoad, setInitialLoad] = useState(true);
   const [searchResultsCount, setSearchResultsCount] = useState<number>(0);
   const [searchFilteredIds, setSearchFilteredIds] = useState<number[]>([]);
-  const [loadedSearchIds, setLoadedSearchIds] = useState<Set<number>>(new Set());
+  const loadedSearchIdsRef = useRef<Set<number>>(new Set());
   const [sortOption, setSortOption] = useState<SortOption>("id");
 
   // Initialize store with initial data
@@ -163,12 +163,12 @@ export function PokemonListClient({ initialData }: PokemonListClientProps) {
       // Load first batch of 20 if we have missing IDs and not currently loading
       const batchSize = 20;
       const idsToLoad = missingIds.slice(0, batchSize);
-      const alreadyLoaded = idsToLoad.length > 0 && idsToLoad.every((id) => loadedSearchIds.has(id));
+      const alreadyLoaded = idsToLoad.length > 0 && idsToLoad.every((id) => loadedSearchIdsRef.current.has(id));
 
       if (idsToLoad.length > 0 && !alreadyLoaded && !isLoading) {
         setLoading(true);
         // Mark these IDs as being loaded
-        setLoadedSearchIds((prev) => new Set([...prev, ...idsToLoad]));
+        idsToLoad.forEach((id) => loadedSearchIdsRef.current.add(id));
         
         Promise.all(idsToLoad.map((id) => getPokemonById(id)))
           .then((details) => {
@@ -178,11 +178,7 @@ export function PokemonListClient({ initialData }: PokemonListClientProps) {
           .catch((error) => {
             console.error("Error fetching Pokemon details for search:", error);
             // Remove from loaded set on error so we can retry
-            setLoadedSearchIds((prev) => {
-              const newSet = new Set(prev);
-              idsToLoad.forEach((id) => newSet.delete(id));
-              return newSet;
-            });
+            idsToLoad.forEach((id) => loadedSearchIdsRef.current.delete(id));
           })
           .finally(() => {
             setLoading(false);
@@ -192,7 +188,10 @@ export function PokemonListClient({ initialData }: PokemonListClientProps) {
       // Normal mode: filter from loaded pokemonList
       setSearchResultsCount(0);
       setSearchFilteredIds([]);
-      setLoadedSearchIds(new Set());
+      // Only reset loadedSearchIds if we're not in search mode
+      if (searchQuery.trim() === "") {
+        loadedSearchIdsRef.current.clear();
+      }
       let filtered = pokemonList;
 
       // Apply search filter
@@ -214,7 +213,7 @@ export function PokemonListClient({ initialData }: PokemonListClientProps) {
 
       setDisplayedPokemon(filtered);
     }
-  }, [pokemonList, allPokemonListItems, searchQuery, selectedTypes, isLoading, addPokemon, setLoading, loadedSearchIds]);
+  }, [pokemonList, allPokemonListItems, searchQuery, selectedTypes, isLoading, addPokemon, setLoading]);
 
   // Sort displayed Pokemon
   const sortedPokemon = useMemo(() => {
@@ -276,7 +275,7 @@ export function PokemonListClient({ initialData }: PokemonListClientProps) {
       const nextBatch = missingIds.slice(0, batchSize);
       
       // Mark as being loaded
-      setLoadedSearchIds((prev) => new Set([...prev, ...nextBatch]));
+      nextBatch.forEach((id) => loadedSearchIdsRef.current.add(id));
       
       const details = await Promise.all(
         nextBatch.map((id) => getPokemonById(id))

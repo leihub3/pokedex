@@ -88,6 +88,7 @@ export const usePokemonStore = create<PokemonStore>()(
         isDarkMode: state.isDarkMode,
         selectedTypes: state.selectedTypes,
       }),
+      skipHydration: false,
     }
   )
 );

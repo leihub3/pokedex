@@ -15,6 +15,8 @@ export function BattleSimulatorClient() {
   const [search2, setSearch2] = useState("");
   const [isLoading1, setIsLoading1] = useState(false);
   const [isLoading2, setIsLoading2] = useState(false);
+  const [error1, setError1] = useState<string | null>(null);
+  const [error2, setError2] = useState<string | null>(null);
   const [battleResult, setBattleResult] = useState<ReturnType<
     typeof calculateBattleOutcome
   > | null>(null);
@@ -22,15 +24,24 @@ export function BattleSimulatorClient() {
   const handleSearch1 = async () => {
     if (!search1.trim()) return;
     setIsLoading1(true);
+    setError1(null);
+    setPokemon1(null);
     try {
       const pokemon = await getPokemonById(search1.toLowerCase());
       setPokemon1(pokemon);
+      setError1(null);
       if (pokemon2) {
         const result = calculateBattleOutcome(pokemon, pokemon2);
         setBattleResult(result);
       }
     } catch (error) {
-      console.error("Error:", error);
+      if (error instanceof Error && error.message === "NOT_FOUND") {
+        setError1(`Pokémon "${search1}" not found. Please check the spelling and try again.`);
+      } else {
+        setError1("Failed to fetch Pokémon. Please try again.");
+      }
+      setPokemon1(null);
+      setBattleResult(null);
     } finally {
       setIsLoading1(false);
     }
@@ -39,15 +50,24 @@ export function BattleSimulatorClient() {
   const handleSearch2 = async () => {
     if (!search2.trim()) return;
     setIsLoading2(true);
+    setError2(null);
+    setPokemon2(null);
     try {
       const pokemon = await getPokemonById(search2.toLowerCase());
       setPokemon2(pokemon);
+      setError2(null);
       if (pokemon1) {
         const result = calculateBattleOutcome(pokemon1, pokemon);
         setBattleResult(result);
       }
     } catch (error) {
-      console.error("Error:", error);
+      if (error instanceof Error && error.message === "NOT_FOUND") {
+        setError2(`Pokémon "${search2}" not found. Please check the spelling and try again.`);
+      } else {
+        setError2("Failed to fetch Pokémon. Please try again.");
+      }
+      setPokemon2(null);
+      setBattleResult(null);
     } finally {
       setIsLoading2(false);
     }
@@ -65,7 +85,10 @@ export function BattleSimulatorClient() {
             <input
               type="text"
               value={search1}
-              onChange={(e) => setSearch1(e.target.value)}
+              onChange={(e) => {
+                setSearch1(e.target.value);
+                if (error1) setError1(null);
+              }}
               onKeyDown={(e) => e.key === "Enter" && handleSearch1()}
               placeholder="Name or ID..."
               className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
@@ -78,6 +101,11 @@ export function BattleSimulatorClient() {
               {isLoading1 ? <LoaderSpinner size="sm" /> : "Search"}
             </button>
           </div>
+          {error1 && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+              <p className="text-sm text-red-600 dark:text-red-400">{error1}</p>
+            </div>
+          )}
           {pokemon1 && (
             <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-800">
               <h3 className="mb-2 text-lg font-semibold capitalize text-gray-900 dark:text-gray-100">
@@ -102,7 +130,10 @@ export function BattleSimulatorClient() {
             <input
               type="text"
               value={search2}
-              onChange={(e) => setSearch2(e.target.value)}
+              onChange={(e) => {
+                setSearch2(e.target.value);
+                if (error2) setError2(null);
+              }}
               onKeyDown={(e) => e.key === "Enter" && handleSearch2()}
               placeholder="Name or ID..."
               className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
@@ -115,6 +146,11 @@ export function BattleSimulatorClient() {
               {isLoading2 ? <LoaderSpinner size="sm" /> : "Search"}
             </button>
           </div>
+          {error2 && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/20">
+              <p className="text-sm text-red-600 dark:text-red-400">{error2}</p>
+            </div>
+          )}
           {pokemon2 && (
             <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-800">
               <h3 className="mb-2 text-lg font-semibold capitalize text-gray-900 dark:text-gray-100">

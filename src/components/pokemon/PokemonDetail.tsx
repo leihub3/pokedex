@@ -13,6 +13,7 @@ import { EvolutionTree } from "./EvolutionTree";
 import { EncounterLocations } from "./EncounterLocations";
 import { SpeciesInfo } from "./SpeciesInfo";
 import { PokemonSpriteCarousel } from "./PokemonSpriteCarousel";
+import { FavoritesButton } from "./FavoritesButton";
 import type { Pokemon, Species } from "@/types/api";
 
 interface PokemonDetailProps {
@@ -49,8 +50,12 @@ export function PokemonDetail({ pokemon, species }: PokemonDetailProps) {
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center space-y-4 rounded-lg border border-gray-200 bg-gradient-to-br from-blue-50 to-purple-50 p-8 dark:from-gray-800 dark:to-gray-900 dark:border-gray-700"
+          className="relative flex flex-col items-center space-y-4 rounded-lg border border-gray-200 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-8 dark:from-gray-800 dark:via-gray-900 dark:to-gray-800 dark:border-gray-700"
         >
+          {/* Favorites Button */}
+          <div className="absolute right-4 top-4">
+            <FavoritesButton pokemonId={pokemon.id} />
+          </div>
           <div className="relative h-64 w-64">
             {imageUrl ? (
               <Image

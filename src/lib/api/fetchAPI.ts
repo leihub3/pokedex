@@ -20,6 +20,9 @@ export async function fetchAPI<T>(
     );
 
     if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error("NOT_FOUND");
+      }
       throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }
 
