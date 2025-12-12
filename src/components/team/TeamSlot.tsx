@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
@@ -12,9 +11,12 @@ interface TeamSlotProps {
   slot: number;
   onRemove: () => void;
   onDrop: (pokemon: Pokemon) => void;
+  onSlotClick?: () => void;
   isDragging: boolean;
   onDragStart: (slot: number) => void;
   onDragEnd: () => void;
+  isMobile?: boolean;
+  isSelectedForMobile?: boolean;
 }
 
 export function TeamSlot({
@@ -22,37 +24,46 @@ export function TeamSlot({
   slot,
   onRemove,
   onDrop,
+  onSlotClick,
   isDragging,
   onDragStart,
   onDragEnd,
+  isMobile = false,
+  isSelectedForMobile = false,
 }: TeamSlotProps) {
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
+    if (!isMobile) {
+      e.preventDefault();
+      setIsDragOver(true);
+    }
   };
 
   const handleDragLeave = () => {
-    setIsDragOver(false);
+    if (!isMobile) {
+      setIsDragOver(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const pokemonData = e.dataTransfer.getData("application/json");
-    if (pokemonData) {
-      try {
-        const pokemon: Pokemon = JSON.parse(pokemonData);
-        onDrop(pokemon);
-      } catch (error) {
-        console.error("Error parsing dropped pokemon:", error);
+    if (!isMobile) {
+      e.preventDefault();
+      setIsDragOver(false);
+      const pokemonData = e.dataTransfer.getData("application/json");
+      if (pokemonData) {
+        try {
+          const pokemon: Pokemon = JSON.parse(pokemonData);
+          onDrop(pokemon);
+        } catch (error) {
+          console.error("Error parsing dropped pokemon:", error);
+        }
       }
     }
   };
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    if (pokemon) {
+    if (!isMobile && pokemon) {
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("application/json", JSON.stringify(pokemon));
       onDragStart(slot);
@@ -60,7 +71,15 @@ export function TeamSlot({
   };
 
   const handleDragEndNative = () => {
-    onDragEnd();
+    if (!isMobile) {
+      onDragEnd();
+    }
+  };
+
+  const handleClick = () => {
+    if (isMobile && onSlotClick && !pokemon && isSelectedForMobile) {
+      onSlotClick();
+    }
   };
 
   const imageUrl =
@@ -70,19 +89,24 @@ export function TeamSlot({
 
   return (
     <div
-      draggable={!!pokemon}
+      draggable={!isMobile && !!pokemon}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEndNative}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onClick={handleClick}
       className={`relative min-h-[200px] rounded-lg border-2 border-dashed p-4 transition-all ${
         isDragOver
           ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
           : pokemon
           ? "border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-800"
+          : isSelectedForMobile && isMobile
+          ? "border-blue-400 bg-blue-50 dark:bg-blue-900/20 cursor-pointer"
           : "border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
-      } ${isDragging ? "opacity-50" : ""} ${pokemon ? "cursor-move hover:scale-105" : ""}`}
+      } ${isDragging ? "opacity-50" : ""} ${
+        pokemon && !isMobile ? "cursor-move hover:scale-105" : ""
+      }`}
     >
       {pokemon ? (
         <div className="flex flex-col items-center space-y-2">
@@ -118,7 +142,10 @@ export function TeamSlot({
             ))}
           </div>
           <button
-            onClick={onRemove}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
             className="mt-2 rounded bg-red-600 px-3 py-1 text-xs text-white hover:bg-red-700"
           >
             Remove
@@ -129,7 +156,11 @@ export function TeamSlot({
           <p className="text-center text-sm text-gray-500 dark:text-gray-500">
             Slot {slot + 1}
             <br />
-            <span className="text-xs">Drop Pokémon here</span>
+            <span className="text-xs">
+              {isMobile && isSelectedForMobile
+                ? "Tap to place Pokémon"
+                : "Drop Pokémon here"}
+            </span>
           </p>
         </div>
       )}

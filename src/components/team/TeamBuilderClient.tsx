@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import { useTeamStore } from "@/store/teamStore";
 import { TeamStatsChart } from "@/components/charts/TeamStatsChart";
 import { TeamSlot } from "./TeamSlot";
@@ -13,7 +12,7 @@ import { AutocompleteInput } from "@/components/ui/AutocompleteInput";
 import type { Pokemon, PokemonListItem } from "@/types/api";
 
 export function TeamBuilderClient() {
-  const { team, addToTeam, removeFromTeam, clearTeam, getTeamStats } =
+  const { team, addToTeam, removeFromTeam, clearTeam } =
     useTeamStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Pokemon[]>([]);
@@ -21,6 +20,24 @@ export function TeamBuilderClient() {
   const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
   const [allPokemonNames, setAllPokemonNames] = useState<string[]>([]);
   const [isLoadingNames, setIsLoadingNames] = useState(true);
+  
+  // Mobile selection state
+  const [selectedPokemon, setSelectedPokemon] = useState<Pokemon | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect if device is mobile/touch
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(
+        'ontouchstart' in window ||
+        navigator.maxTouchPoints > 0 ||
+        (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
+      );
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Load all Pokémon names for autocomplete
   useEffect(() => {
@@ -57,6 +74,25 @@ export function TeamBuilderClient() {
 
   const handleDrop = (pokemon: Pokemon, slot: number) => {
     addToTeam(pokemon, slot);
+    if (isMobile) {
+      setSelectedPokemon(null);
+    }
+  };
+
+  // Mobile: handle selecting a Pokemon
+  const handlePokemonSelect = (pokemon: Pokemon) => {
+    if (isMobile) {
+      setSelectedPokemon(pokemon);
+    }
+  };
+
+  // Mobile: handle placing Pokemon in slot
+  const handleSlotClick = (slot: number) => {
+    if (isMobile && selectedPokemon) {
+      addToTeam(selectedPokemon, slot);
+      setSelectedPokemon(null);
+      setSearchResults([]);
+    }
   };
 
   const handleDragStart = (slot: number) => {
@@ -75,6 +111,37 @@ export function TeamBuilderClient() {
 
   return (
     <div className="space-y-8">
+      {/* Mobile: Show selected Pokemon indicator */}
+      {isMobile && selectedPokemon && (
+        <div className="rounded-lg border-2 border-blue-500 bg-blue-50 p-4 dark:bg-blue-900/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {selectedPokemon.sprites.front_default && (
+                <img
+                  src={selectedPokemon.sprites.front_default}
+                  alt={selectedPokemon.name}
+                  className="h-12 w-12 object-contain"
+                />
+              )}
+              <div>
+                <p className="font-semibold capitalize text-gray-900 dark:text-gray-100">
+                  {selectedPokemon.name}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Tap a slot to place
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setSelectedPokemon(null)}
+              className="rounded bg-gray-600 px-3 py-1 text-xs text-white hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Search */}
       <div className="flex gap-4">
         <AutocompleteInput
@@ -106,15 +173,21 @@ export function TeamBuilderClient() {
             {searchResults.map((pokemon) => (
               <div
                 key={pokemon.id}
-                draggable
+                draggable={!isMobile}
                 onDragStart={(e: React.DragEvent) => {
-                  e.dataTransfer.effectAllowed = "move";
-                  e.dataTransfer.setData(
-                    "application/json",
-                    JSON.stringify(pokemon)
-                  );
+                  if (!isMobile) {
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData(
+                      "application/json",
+                      JSON.stringify(pokemon)
+                    );
+                  }
                 }}
-                className="flex cursor-move items-center justify-between rounded border border-gray-200 bg-gray-50 p-3 transition-transform hover:scale-[1.02] dark:border-gray-700 dark:bg-gray-900"
+                className={`flex items-center justify-between rounded border border-gray-200 bg-gray-50 p-3 transition-transform dark:border-gray-700 dark:bg-gray-900 ${
+                  isMobile
+                    ? "cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                    : "cursor-move hover:scale-[1.02]"
+                }`}
               >
                 <div className="flex items-center gap-3">
                   {pokemon.sprites.front_default && (
@@ -133,9 +206,18 @@ export function TeamBuilderClient() {
                     </p>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Drag to slot
-                </p>
+                {isMobile ? (
+                  <button
+                    onClick={() => handlePokemonSelect(pokemon)}
+                    className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                  >
+                    Select
+                  </button>
+                ) : (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Drag to slot
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -163,9 +245,12 @@ export function TeamBuilderClient() {
               slot={slot}
               onRemove={() => removeFromTeam(slot)}
               onDrop={(p) => handleDrop(p, slot)}
+              onSlotClick={() => handleSlotClick(slot)}
               isDragging={draggingSlot === slot}
               onDragStart={handleDragStart}
               onDragEnd={handleSlotDragEnd}
+              isMobile={isMobile}
+              isSelectedForMobile={selectedPokemon !== null}
             />
           ))}
         </div>
