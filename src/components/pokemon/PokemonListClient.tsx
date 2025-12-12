@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
-import { getPokemonList, getPokemonById, getAllPokemonList } from "@/lib/api/pokemon";
+import { getPokemonList, getPokemonById, getAllPokemonList, getPokemonByTypes } from "@/lib/api/pokemon";
 import { usePokemonStore } from "@/store/pokemonStore";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { PokemonCard } from "./PokemonCard";
@@ -97,11 +97,10 @@ export function PokemonListClient({ initialData }: PokemonListClientProps) {
     fetchPokemonDetails();
   }, [pokemonListItems, pokemonList, setLoading, addPokemon]);
 
-  // Fetch all Pokémon list when search is active or type filter is active (only once)
+  // Fetch all Pokémon list when search is active (only once)
   useEffect(() => {
     const fetchAllPokemonList = async () => {
-      const needsFullList = (searchQuery.trim() || selectedTypes.length > 0) && allPokemonListItems.length === 0;
-      if (needsFullList) {
+      if (searchQuery.trim() && allPokemonListItems.length === 0) {
         setLoading(true);
         try {
           const allPokemon = await getAllPokemonList();
@@ -115,17 +114,56 @@ export function PokemonListClient({ initialData }: PokemonListClientProps) {
     };
 
     fetchAllPokemonList();
-  }, [searchQuery, selectedTypes.length, allPokemonListItems.length, setAllPokemonListItems, setLoading]);
+  }, [searchQuery, allPokemonListItems.length, setAllPokemonListItems, setLoading]);
+
+  // Track previous selected types to detect changes
+  const prevSelectedTypesRef = useRef<string[]>([]);
+  
+  // Fetch Pokémon by type when type filter is active
+  useEffect(() => {
+    const fetchPokemonByType = async () => {
+      if (selectedTypes.length > 0) {
+        // Only fetch if types changed
+        const typesChanged = 
+          selectedTypes.length !== prevSelectedTypesRef.current.length ||
+          !selectedTypes.every((type, idx) => type === prevSelectedTypesRef.current[idx]);
+        
+        if (typesChanged) {
+          setLoading(true);
+          try {
+            const typePokemon = await getPokemonByTypes(selectedTypes);
+            // Store the filtered list items for type filtering
+            setAllPokemonListItems(typePokemon);
+            prevSelectedTypesRef.current = [...selectedTypes];
+          } catch (error) {
+            console.error("Error fetching Pokemon by type:", error);
+          } finally {
+            setLoading(false);
+          }
+        }
+      } else if (prevSelectedTypesRef.current.length > 0) {
+        // Types were cleared, reset the list if we're not searching
+        if (!searchQuery.trim()) {
+          setAllPokemonListItems([]);
+          prevSelectedTypesRef.current = [];
+        }
+      }
+    };
+
+    fetchPokemonByType();
+  }, [selectedTypes, searchQuery, setAllPokemonListItems, setLoading]);
 
   // Filter Pokemon based on search and types
   useEffect(() => {
-    // If searching or filtering by type, use allPokemonListItems
-    const needsFullList = (searchQuery.trim() || selectedTypes.length > 0) && allPokemonListItems.length > 0;
+    // If searching, use allPokemonListItems (contains all Pokemon for search)
+    // If filtering by type, use allPokemonListItems (contains only Pokemon of selected types)
+    const hasActiveFilter = searchQuery.trim() || selectedTypes.length > 0;
+    const hasFullList = allPokemonListItems.length > 0;
     
-    if (needsFullList) {
+    if (hasActiveFilter && hasFullList) {
       let filteredListItems = allPokemonListItems;
 
-      // Apply search filter if active
+      // Apply search filter if active (on top of type filter if both are active)
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         filteredListItems = filteredListItems.filter((item) =>
@@ -141,56 +179,27 @@ export function PokemonListClient({ initialData }: PokemonListClientProps) {
         })
         .filter((id): id is number => id !== null);
 
-      // Handle type filter: we need to load Pokemon details to check their types
+      // Handle type filter mode
       if (selectedTypes.length > 0) {
-        // Store all candidate IDs (will filter by type after loading)
         setTypeFilteredIds(allFilteredIds);
-        setSearchFilteredIds([]);
-        setSearchResultsCount(0);
+        setTypeResultsCount(allFilteredIds.length); // Accurate count since we got it from API
+        if (!searchQuery.trim()) {
+          // Type filter only, no search
+          setSearchFilteredIds([]);
+          setSearchResultsCount(0);
+        }
       } else if (searchQuery.trim()) {
         // Search only mode
         setSearchFilteredIds(allFilteredIds);
         setSearchResultsCount(allFilteredIds.length);
         setTypeFilteredIds([]);
         setTypeResultsCount(0);
-      } else {
-        // Reset filters
-        setSearchFilteredIds([]);
-        setSearchResultsCount(0);
-        setTypeFilteredIds([]);
-        setTypeResultsCount(0);
       }
 
       // Filter pokemonList by IDs (only show loaded ones)
-      let filtered = pokemonList.filter((pokemon) =>
+      const filtered = pokemonList.filter((pokemon) =>
         allFilteredIds.includes(pokemon.id)
       );
-
-      // Apply type filter on loaded Pokemon
-      if (selectedTypes.length > 0) {
-        filtered = filtered.filter((pokemon) =>
-          pokemon.types.some((typeSlot) =>
-            selectedTypes.includes(typeSlot.type.name)
-          )
-        );
-        
-        // Update type results count based on loaded Pokemon
-        // This gives a more accurate count as we load more
-        const loadedCount = pokemonList.filter((p) => allFilteredIds.includes(p.id)).length;
-        if (loadedCount >= 50 && loadedCount > 0) {
-          // If we've loaded a good sample, estimate total matches
-          const matchRate = filtered.length / loadedCount;
-          const estimated = Math.ceil(matchRate * allFilteredIds.length);
-          setTypeResultsCount(Math.min(estimated, allFilteredIds.length));
-        } else if (loadedCount > 0) {
-          // While loading, show at least the matches found so far
-          // Use a conservative estimate that will grow as we load more
-          setTypeResultsCount(Math.max(filtered.length * 2, filtered.length));
-        } else {
-          // Initial state: show a placeholder estimate
-          setTypeResultsCount(allFilteredIds.length / 10);
-        }
-      }
 
       // Update displayed pokemon immediately
       setDisplayedPokemon(filtered);
@@ -226,7 +235,7 @@ export function PokemonListClient({ initialData }: PokemonListClientProps) {
             setLoading(false);
           });
       }
-    } else {
+    } else if (!hasActiveFilter) {
       // Normal mode: filter from loaded pokemonList only
       setSearchResultsCount(0);
       setSearchFilteredIds([]);
@@ -234,14 +243,12 @@ export function PokemonListClient({ initialData }: PokemonListClientProps) {
       setTypeFilteredIds([]);
       
       // Reset loaded refs if filters are cleared
-      if (searchQuery.trim() === "" && selectedTypes.length === 0) {
-        loadedSearchIdsRef.current.clear();
-        loadedTypeIdsRef.current.clear();
-      }
+      loadedSearchIdsRef.current.clear();
+      loadedTypeIdsRef.current.clear();
       
       let filtered = pokemonList;
 
-      // Apply search filter
+      // Apply search filter (on already loaded Pokemon only)
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         filtered = filtered.filter((pokemon) =>
@@ -249,7 +256,7 @@ export function PokemonListClient({ initialData }: PokemonListClientProps) {
         );
       }
 
-      // Apply type filter (only on loaded Pokemon)
+      // Apply type filter (on already loaded Pokemon only)
       if (selectedTypes.length > 0) {
         filtered = filtered.filter((pokemon) =>
           pokemon.types.some((typeSlot) =>

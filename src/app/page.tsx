@@ -2,6 +2,9 @@ import { Suspense } from "react";
 import { getPokemonList } from "@/lib/api/pokemon";
 import { PokemonListClient } from "@/components/pokemon/PokemonListClient";
 import { PokemonCardSkeleton } from "@/components/ui/Skeleton";
+import { HeroSection } from "@/components/home/HeroSection";
+import { StatsSection } from "@/components/home/StatsSection";
+import { FeaturesSection } from "@/components/home/FeaturesSection";
 
 async function getInitialPokemon() {
   try {
@@ -23,13 +26,17 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4 py-8">
+      <HeroSection />
+      <StatsSection />
+      <FeaturesSection />
+      
+      <div className="container mx-auto px-4 py-12" id="pokemon">
         <div className="mb-8 text-center">
-          <h1 className="mb-2 text-4xl font-bold text-gray-900 dark:text-gray-100">
-            Pokémon Explorer
-          </h1>
+          <h2 className="mb-2 text-4xl font-bold text-gray-900 dark:text-gray-100">
+            Discover Pokémon
+          </h2>
           <p className="text-gray-600 dark:text-gray-400">
-            Discover and explore your favorite Pokémon
+            Browse through all available Pokémon
           </p>
         </div>
 

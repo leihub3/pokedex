@@ -3,6 +3,7 @@ import {
   Pokemon,
   PokemonListResponse,
   PokemonTypeResponse,
+  PokemonListItem,
   PokemonSchema,
   PokemonListResponseSchema,
   PokemonTypeResponseSchema,
@@ -87,6 +88,48 @@ export function searchPokemonByName(
   return pokemonList.filter((pokemon) =>
     pokemon.name.toLowerCase().includes(lowerQuery)
   );
+}
+
+/**
+ * Get all Pokémon of a specific type
+ * @param typeName - The name of the Pokémon type (e.g., "fire", "water")
+ */
+export async function getPokemonByType(typeName: string): Promise<PokemonListItem[]> {
+  const url = `${POKEAPI_BASE_URL}/type/${typeName}`;
+  const typeResponse = await fetchAPI(url, PokemonTypeResponseSchema);
+  
+  // Extract PokemonListItem from the pokemon array
+  return typeResponse.pokemon.map((entry) => entry.pokemon);
+}
+
+/**
+ * Get all Pokémon that match any of the selected types
+ * @param selectedTypes - Array of type names
+ */
+export async function getPokemonByTypes(selectedTypes: string[]): Promise<PokemonListItem[]> {
+  if (selectedTypes.length === 0) return [];
+
+  // Fetch Pokémon for each type
+  const typeResults = await Promise.all(
+    selectedTypes.map((type) => getPokemonByType(type))
+  );
+
+  // Combine and deduplicate (a Pokémon can have multiple types)
+  const pokemonMap = new Map<number, PokemonListItem>();
+  
+  for (const pokemonList of typeResults) {
+    for (const pokemon of pokemonList) {
+      const match = pokemon.url.match(/\/pokemon\/(\d+)\//);
+      if (match) {
+        const id = parseInt(match[1], 10);
+        if (!pokemonMap.has(id)) {
+          pokemonMap.set(id, pokemon);
+        }
+      }
+    }
+  }
+
+  return Array.from(pokemonMap.values());
 }
 
 /**

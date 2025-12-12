@@ -247,6 +247,11 @@ function ScoreCard({
             </span>
           </p>
           <p className="text-xs text-gray-600 dark:text-gray-400">
+            {score.playerName && (
+              <span className="font-semibold text-blue-600 dark:text-blue-400 mr-2">
+                👤 {score.playerName}
+              </span>
+            )}
             {formattedDate} • {score.time}s
             {score.streak && score.streak > 1 && (
               <span className="ml-2 text-green-600 dark:text-green-400">

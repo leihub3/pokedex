@@ -8,6 +8,7 @@ export interface QuizScore {
   date: string;
   accuracy?: number; // porcentaje de aciertos
   streak?: number; // racha actual
+  playerName?: string; // nombre del jugador
 }
 
 export interface QuizStats {
@@ -21,6 +22,8 @@ export interface QuizStats {
 
 interface QuizStore {
   scores: QuizScore[];
+  playerName: string; // nombre predeterminado del jugador
+  setPlayerName: (name: string) => void;
   addScore: (score: QuizScore) => void;
   getHighScore: () => QuizScore | null;
   clearScores: () => void;
@@ -35,6 +38,8 @@ export const useQuizStore = create<QuizStore>()(
   persist(
     (set, get) => ({
       scores: [],
+      playerName: "",
+      setPlayerName: (name: string) => set({ playerName: name }),
       addScore: (score) => {
         const scores = get().scores;
         const lastScore = scores.length > 0 ? scores[scores.length - 1] : null;
@@ -56,10 +61,14 @@ export const useQuizStore = create<QuizStore>()(
           streak = 0;
         }
         
+        // Usar el nombre del jugador del score o el nombre predeterminado
+        const playerName = score.playerName || get().playerName || "Player";
+        
         const newScore: QuizScore = {
           ...score,
           accuracy,
           streak,
+          playerName,
         };
         
         set((state) => ({

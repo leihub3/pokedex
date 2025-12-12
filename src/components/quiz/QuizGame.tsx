@@ -20,7 +20,9 @@ export function QuizGame() {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
-  const { addScore, getStats } = useQuizStore();
+  const [playerName, setPlayerName] = useState("");
+  const [showNameInput, setShowNameInput] = useState(false);
+  const { addScore, getStats, playerName: storedName, setPlayerName: setStoredName } = useQuizStore();
 
   useEffect(() => {
     const loadPokemon = async () => {
@@ -34,7 +36,19 @@ export function QuizGame() {
       }
     };
     loadPokemon();
-  }, []);
+    
+    // Load stored player name if available
+    if (storedName) {
+      setPlayerName(storedName);
+    }
+  }, [storedName]);
+
+  const handleNameSubmit = () => {
+    if (playerName.trim()) {
+      setStoredName(playerName.trim());
+      setShowNameInput(false);
+    }
+  };
 
   const startGame = () => {
     setIsGameActive(true);
@@ -104,6 +118,7 @@ export function QuizGame() {
         time: 30,
         date: new Date().toISOString(),
         accuracy,
+        playerName: playerName || storedName || undefined,
       });
     }
   }, [timeLeft, isGameActive, score, round, addScore]);
@@ -134,6 +149,7 @@ export function QuizGame() {
       time: 30 - timeLeft,
       date: new Date().toISOString(),
       accuracy,
+      playerName: playerName || storedName || undefined,
     });
   };
 
@@ -149,13 +165,78 @@ export function QuizGame() {
     const stats = getStats();
     return (
       <div className="space-y-6">
+        {/* Player Name Section */}
+        <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-800">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Player Name
+            </h3>
+            {playerName && !showNameInput && (
+              <button
+                onClick={() => setShowNameInput(true)}
+                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+              >
+                Change
+              </button>
+            )}
+          </div>
+          
+          {showNameInput || !playerName ? (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleNameSubmit();
+                  }
+                }}
+                placeholder="Enter your name..."
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+              <button
+                onClick={handleNameSubmit}
+                disabled={!playerName.trim()}
+                className="rounded-lg bg-blue-600 px-6 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                Save
+              </button>
+              {playerName && (
+                <button
+                  onClick={() => {
+                    setShowNameInput(false);
+                    setPlayerName(storedName || "");
+                  }}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 transition-all"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                👤 {playerName}
+              </span>
+            </div>
+          )}
+        </div>
+
         <div className="text-center">
           <button
             onClick={startGame}
-            className="rounded-lg bg-blue-600 px-8 py-4 text-xl font-semibold text-white hover:bg-blue-700 transition-all hover:scale-105"
+            disabled={!playerName.trim()}
+            className="rounded-lg bg-blue-600 px-8 py-4 text-xl font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
           >
             Start Quiz
           </button>
+          {!playerName.trim() && (
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Please enter your name first
+            </p>
+          )}
         </div>
         
         {/* Quick Stats */}
