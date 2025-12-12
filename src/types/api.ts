@@ -63,7 +63,7 @@ export const PokemonSpritesSchema = z.object({
 export const PokemonSchema = z.object({
   id: z.number(),
   name: z.string(),
-  base_experience: z.number(),
+  base_experience: z.number().nullable(),
   height: z.number(),
   weight: z.number(),
   sprites: PokemonSpritesSchema,

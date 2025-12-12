@@ -79,16 +79,29 @@ export function QuizGame() {
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
-        if (prev <= 1) {
-          endGame();
+        const newTime = prev - 1;
+        if (newTime <= 0) {
           return 0;
         }
-        return prev - 1;
+        return newTime;
       });
     }, 1000);
 
     return () => clearInterval(timer);
   }, [isGameActive]);
+
+  // Handle game end when time runs out
+  useEffect(() => {
+    if (isGameActive && timeLeft === 0) {
+      setIsGameActive(false);
+      addScore({
+        score,
+        total: round + 1,
+        time: 30,
+        date: new Date().toISOString(),
+      });
+    }
+  }, [timeLeft, isGameActive, score, round, addScore]);
 
   const handleAnswer = (answer: string) => {
     if (!currentPokemon || selectedAnswer) return;

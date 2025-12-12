@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { getPokemonById } from "@/lib/api/pokemon";
+import { getPokemonById, getAllPokemonList } from "@/lib/api/pokemon";
 import { calculateBattleOutcome } from "@/lib/utils/battleCalculations";
 import { LoaderSpinner } from "@/components/ui/LoaderSpinner";
 import { Badge } from "@/components/ui/Badge";
-import type { Pokemon } from "@/types/api";
+import { AutocompleteInput } from "@/components/ui/AutocompleteInput";
+import type { Pokemon, PokemonListItem } from "@/types/api";
 
 export function BattleSimulatorClient() {
   const [pokemon1, setPokemon1] = useState<Pokemon | null>(null);
@@ -17,17 +18,36 @@ export function BattleSimulatorClient() {
   const [isLoading2, setIsLoading2] = useState(false);
   const [error1, setError1] = useState<string | null>(null);
   const [error2, setError2] = useState<string | null>(null);
+  const [allPokemonNames, setAllPokemonNames] = useState<string[]>([]);
+  const [isLoadingNames, setIsLoadingNames] = useState(true);
   const [battleResult, setBattleResult] = useState<ReturnType<
     typeof calculateBattleOutcome
   > | null>(null);
 
-  const handleSearch1 = async () => {
-    if (!search1.trim()) return;
+  // Load all Pokémon names for autocomplete
+  useEffect(() => {
+    const loadPokemonNames = async () => {
+      try {
+        const response = await getAllPokemonList();
+        const names = response.results.map((item: PokemonListItem) => item.name);
+        setAllPokemonNames(names);
+      } catch (error) {
+        console.error("Error loading Pokémon names:", error);
+      } finally {
+        setIsLoadingNames(false);
+      }
+    };
+    loadPokemonNames();
+  }, []);
+
+  const handleSearch1 = async (searchTerm?: string) => {
+    const term = searchTerm || search1;
+    if (!term.trim()) return;
     setIsLoading1(true);
     setError1(null);
     setPokemon1(null);
     try {
-      const pokemon = await getPokemonById(search1.toLowerCase());
+      const pokemon = await getPokemonById(term.toLowerCase());
       setPokemon1(pokemon);
       setError1(null);
       if (pokemon2) {
@@ -36,7 +56,7 @@ export function BattleSimulatorClient() {
       }
     } catch (error) {
       if (error instanceof Error && error.message === "NOT_FOUND") {
-        setError1(`Pokémon "${search1}" not found. Please check the spelling and try again.`);
+        setError1(`Pokémon "${term}" not found. Please check the spelling and try again.`);
       } else {
         setError1("Failed to fetch Pokémon. Please try again.");
       }
@@ -47,13 +67,14 @@ export function BattleSimulatorClient() {
     }
   };
 
-  const handleSearch2 = async () => {
-    if (!search2.trim()) return;
+  const handleSearch2 = async (searchTerm?: string) => {
+    const term = searchTerm || search2;
+    if (!term.trim()) return;
     setIsLoading2(true);
     setError2(null);
     setPokemon2(null);
     try {
-      const pokemon = await getPokemonById(search2.toLowerCase());
+      const pokemon = await getPokemonById(term.toLowerCase());
       setPokemon2(pokemon);
       setError2(null);
       if (pokemon1) {
@@ -62,7 +83,7 @@ export function BattleSimulatorClient() {
       }
     } catch (error) {
       if (error instanceof Error && error.message === "NOT_FOUND") {
-        setError2(`Pokémon "${search2}" not found. Please check the spelling and try again.`);
+        setError2(`Pokémon "${term}" not found. Please check the spelling and try again.`);
       } else {
         setError2("Failed to fetch Pokémon. Please try again.");
       }
@@ -82,20 +103,22 @@ export function BattleSimulatorClient() {
             Pokémon 1
           </h2>
           <div className="flex gap-2">
-            <input
-              type="text"
+            <AutocompleteInput
               value={search1}
-              onChange={(e) => {
-                setSearch1(e.target.value);
+              onChange={(value) => {
+                setSearch1(value);
                 if (error1) setError1(null);
               }}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch1()}
+              onSelect={handleSearch1}
+              options={allPokemonNames}
               placeholder="Name or ID..."
-              className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              className="flex-1"
+              maxSuggestions={8}
+              disabled={isLoadingNames || isLoading1}
             />
             <button
               onClick={handleSearch1}
-              disabled={isLoading1}
+              disabled={isLoading1 || isLoadingNames}
               className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
             >
               {isLoading1 ? <LoaderSpinner size="sm" /> : "Search"}
@@ -127,20 +150,22 @@ export function BattleSimulatorClient() {
             Pokémon 2
           </h2>
           <div className="flex gap-2">
-            <input
-              type="text"
+            <AutocompleteInput
               value={search2}
-              onChange={(e) => {
-                setSearch2(e.target.value);
+              onChange={(value) => {
+                setSearch2(value);
                 if (error2) setError2(null);
               }}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch2()}
+              onSelect={handleSearch2}
+              options={allPokemonNames}
               placeholder="Name or ID..."
-              className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              className="flex-1"
+              maxSuggestions={8}
+              disabled={isLoadingNames || isLoading2}
             />
             <button
               onClick={handleSearch2}
-              disabled={isLoading2}
+              disabled={isLoading2 || isLoadingNames}
               className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
             >
               {isLoading2 ? <LoaderSpinner size="sm" /> : "Search"}
