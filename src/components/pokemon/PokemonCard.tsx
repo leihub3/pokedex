@@ -28,7 +28,6 @@ export function PokemonCard({ pokemon, index = 0 }: PokemonCardProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
       variants={cardHover}
-      initial="rest"
       whileHover="hover"
       whileTap="tap"
     >

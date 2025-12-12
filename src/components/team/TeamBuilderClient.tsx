@@ -104,18 +104,17 @@ export function TeamBuilderClient() {
           </h3>
           <div className="space-y-2">
             {searchResults.map((pokemon) => (
-              <motion.div
+              <div
                 key={pokemon.id}
                 draggable
-                onDragStart={(e) => {
+                onDragStart={(e: React.DragEvent) => {
                   e.dataTransfer.effectAllowed = "move";
                   e.dataTransfer.setData(
                     "application/json",
                     JSON.stringify(pokemon)
                   );
                 }}
-                whileHover={{ scale: 1.02 }}
-                className="flex cursor-move items-center justify-between rounded border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900"
+                className="flex cursor-move items-center justify-between rounded border border-gray-200 bg-gray-50 p-3 transition-transform hover:scale-[1.02] dark:border-gray-700 dark:bg-gray-900"
               >
                 <div className="flex items-center gap-3">
                   {pokemon.sprites.front_default && (
@@ -137,7 +136,7 @@ export function TeamBuilderClient() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Drag to slot
                 </p>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>

@@ -8,6 +8,10 @@ import { getEvolutionChainFromSpecies, getPokemonById } from "@/lib/api";
 import { LoaderSpinner } from "@/components/ui/LoaderSpinner";
 import { Badge } from "@/components/ui/Badge";
 import type { EvolutionChain, Pokemon } from "@/types/api";
+import { ChainLinkSchema } from "@/types/api";
+import type { z } from "zod";
+
+type ChainLink = z.infer<typeof ChainLinkSchema>;
 
 interface EvolutionTreeProps {
   speciesUrl: string;
@@ -166,10 +170,10 @@ export function EvolutionTree({
   const rootNode: EvolutionNode = {
     species: evolutionChain.chain.species,
     evolutionDetails: evolutionChain.chain.evolution_details,
-    evolvesTo: evolutionChain.chain.evolves_to.map((child) => ({
+    evolvesTo: evolutionChain.chain.evolves_to.map((child: ChainLink) => ({
       species: child.species,
       evolutionDetails: child.evolution_details,
-      evolvesTo: child.evolves_to.map((grandchild) => ({
+      evolvesTo: child.evolves_to.map((grandchild: ChainLink) => ({
         species: grandchild.species,
         evolutionDetails: grandchild.evolution_details,
         evolvesTo: [],
