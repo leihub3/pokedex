@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useQuizStore, type QuizScore, type QuizStats } from "@/store/quizStore";
+import { QuizType, QUIZ_TYPE_METADATA } from "@/types/quiz";
 import { motion } from "framer-motion";
 
 interface Badge {
@@ -69,12 +71,25 @@ const createBadges = (stats: QuizStats, scores: QuizScore[]): Badge[] => [
 ];
 
 export function QuizHistory() {
-  const { scores, getStats, getRecentScores, getTopScores, clearScores } = useQuizStore();
-  const stats = getStats();
-  const recentScores = getRecentScores(5);
-  const topScores = getTopScores(5);
+  const [selectedQuizType, setSelectedQuizType] = useState<QuizType | "all">("all");
+  const { scores, getStats, getStatsByType, getRecentScores, getTopScores, getTopScoresByType, clearScores } = useQuizStore();
   
-  const badges = createBadges(stats, scores);
+  // Filter scores by selected quiz type
+  const filteredScores = selectedQuizType === "all" 
+    ? scores 
+    : scores.filter(s => s.quizType === selectedQuizType);
+  
+  const stats = selectedQuizType === "all" 
+    ? getStats() 
+    : getStatsByType(selectedQuizType);
+  const recentScores = selectedQuizType === "all"
+    ? getRecentScores(5)
+    : filteredScores.slice().reverse().slice(0, 5);
+  const topScores = selectedQuizType === "all"
+    ? getTopScores(5)
+    : getTopScoresByType(selectedQuizType, 5);
+  
+  const badges = createBadges(stats, filteredScores);
   const earnedBadges = badges.filter(badge => badge.condition(stats));
   
   if (scores.length === 0) {
@@ -87,8 +102,45 @@ export function QuizHistory() {
     );
   }
 
+  // Get unique quiz types from scores
+  const availableQuizTypes = Array.from(new Set(scores.map(s => s.quizType).filter(Boolean))) as QuizType[];
+
   return (
     <div className="space-y-6">
+      {/* Quiz Type Filter */}
+      <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-800">
+        <div className="mb-3">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Filter by Quiz Type</h3>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setSelectedQuizType("all")}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+              selectedQuizType === "all"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            }`}
+          >
+            All Types
+          </button>
+          {availableQuizTypes.map((type) => {
+            const metadata = QUIZ_TYPE_METADATA[type];
+            return (
+              <button
+                key={type}
+                onClick={() => setSelectedQuizType(type)}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+                  selectedQuizType === type
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                }`}
+              >
+                {metadata.icon} {metadata.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       {/* Stats Overview */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -152,7 +204,7 @@ export function QuizHistory() {
       <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-800">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Top Scores
+            Top Scores {selectedQuizType !== "all" && `(${QUIZ_TYPE_METADATA[selectedQuizType].name})`}
           </h3>
         </div>
         <div className="space-y-2">
@@ -162,11 +214,42 @@ export function QuizHistory() {
         </div>
       </div>
 
+      {/* Per-Type Stats (if filtered) */}
+      {selectedQuizType !== "all" && (
+        <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-800">
+          <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {QUIZ_TYPE_METADATA[selectedQuizType].name} Stats
+          </h3>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              title="Total Games"
+              value={stats.totalGames}
+              icon="🎮"
+            />
+            <StatCard
+              title="Best Score"
+              value={stats.bestScore}
+              icon="🏆"
+            />
+            <StatCard
+              title="Avg Accuracy"
+              value={`${stats.averageAccuracy.toFixed(1)}%`}
+              icon="🎯"
+            />
+            <StatCard
+              title="Current Streak"
+              value={stats.currentStreak}
+              icon="🔥"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Recent Scores */}
       <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-800">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Recent Games
+            Recent Games {selectedQuizType !== "all" && `(${QUIZ_TYPE_METADATA[selectedQuizType].name})`}
           </h3>
           <button
             onClick={clearScores}
@@ -245,6 +328,11 @@ function ScoreCard({
             <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">
               ({accuracy.toFixed(1)}%)
             </span>
+            {score.quizType && (
+              <span className="ml-2 text-xs text-gray-500 dark:text-gray-500">
+                {QUIZ_TYPE_METADATA[score.quizType].icon}
+              </span>
+            )}
           </p>
           <p className="text-xs text-gray-600 dark:text-gray-400">
             {score.playerName && (

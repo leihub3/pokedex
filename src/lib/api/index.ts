@@ -8,4 +8,5 @@ export * from "./evolution";
 export * from "./generations";
 export * from "./species";
 export * from "./encounters";
+export * from "./quizData";
 

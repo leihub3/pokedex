@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { QuizType } from "@/types/quiz";
 
 export interface QuizScore {
   score: number;
@@ -9,6 +10,7 @@ export interface QuizScore {
   accuracy?: number; // porcentaje de aciertos
   streak?: number; // racha actual
   playerName?: string; // nombre del jugador
+  quizType?: QuizType; // tipo de quiz
 }
 
 export interface QuizStats {
@@ -30,8 +32,10 @@ interface QuizStore {
   
   // Nuevas funciones
   getStats: () => QuizStats;
+  getStatsByType: (quizType: QuizType) => QuizStats;
   getRecentScores: (limit?: number) => QuizScore[];
   getTopScores: (limit?: number) => QuizScore[];
+  getTopScoresByType: (quizType: QuizType, limit?: number) => QuizScore[];
 }
 
 export const useQuizStore = create<QuizStore>()(
@@ -72,9 +76,13 @@ export const useQuizStore = create<QuizStore>()(
         };
         
         set((state) => ({
-          scores: [...state.scores, newScore].sort(
-            (a, b) => b.score - a.score || a.time - b.time
-          ),
+          scores: [...state.scores, newScore].sort((a, b) => {
+            // Sort by score first, then by time, then by quiz type for consistency
+            if (b.score !== a.score) return b.score - a.score;
+            if (a.time !== b.time) return a.time - b.time;
+            // If same score and time, maintain order
+            return 0;
+          }),
         }));
       },
       getHighScore: () => {
@@ -116,6 +124,39 @@ export const useQuizStore = create<QuizStore>()(
       },
       getTopScores: (limit = 10) => {
         const scores = get().scores;
+        return scores.slice(0, limit);
+      },
+      getStatsByType: (quizType: QuizType): QuizStats => {
+        const scores = get().scores.filter((s) => s.quizType === quizType);
+        if (scores.length === 0) {
+          return {
+            totalGames: 0,
+            averageScore: 0,
+            averageAccuracy: 0,
+            bestScore: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+          };
+        }
+        
+        const totalGames = scores.length;
+        const averageScore = scores.reduce((sum, s) => sum + s.score, 0) / totalGames;
+        const averageAccuracy = scores.reduce((sum, s) => sum + (s.accuracy || 0), 0) / totalGames;
+        const bestScore = Math.max(...scores.map(s => s.score));
+        const longestStreak = Math.max(...scores.map(s => s.streak || 0), 0);
+        const currentStreak = scores[scores.length - 1]?.streak || 0;
+        
+        return {
+          totalGames,
+          averageScore: Math.round(averageScore * 10) / 10,
+          averageAccuracy: Math.round(averageAccuracy * 10) / 10,
+          bestScore,
+          currentStreak,
+          longestStreak,
+        };
+      },
+      getTopScoresByType: (quizType: QuizType, limit = 10) => {
+        const scores = get().scores.filter((s) => s.quizType === quizType);
         return scores.slice(0, limit);
       },
       clearScores: () => set({ scores: [] }),
