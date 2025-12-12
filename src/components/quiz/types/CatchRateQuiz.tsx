@@ -27,7 +27,7 @@ export function CatchRateQuiz({ onAnswer, selectedAnswer, isLoading, round }: Ca
       // Get capture rates for all Pokemon
       const rates = new Map<number, number>();
       for (const p of pokemon) {
-        const rate = await getPokemonCaptureRate(p.id);
+        const rate = await getPokemonCaptureRate(p.id, p.name, p);
         if (rate !== null) {
           rates.set(p.id, rate);
         }

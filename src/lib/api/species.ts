@@ -25,3 +25,11 @@ export async function getSpeciesByName(name: string): Promise<Species> {
   return fetchAPI(url, SpeciesSchema);
 }
 
+/**
+ * Fetch a Pokémon species by URL
+ * @param speciesUrl - Species API URL
+ */
+export async function getSpeciesByUrl(speciesUrl: string): Promise<Species> {
+  return fetchAPI(speciesUrl, SpeciesSchema);
+}
+

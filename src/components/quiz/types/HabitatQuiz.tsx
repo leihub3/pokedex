@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getPokemonByType, getPokemonHabitat } from "@/lib/api/quizData";
+import { getPokemonHabitat } from "@/lib/api/quizData";
 import { generateWrongPokemonNames, formatPokemonName } from "@/lib/utils/quizHelpers";
 import { getPokemonById, getAllPokemonList } from "@/lib/api/pokemon";
 import type { Pokemon } from "@/types/api";
@@ -33,10 +33,12 @@ export function HabitatQuiz({ onAnswer, selectedAnswer, isLoading, round }: Habi
         if (!match) continue;
 
         const pokemonId = parseInt(match[1], 10);
-        const pokemonHabitat = await getPokemonHabitat(pokemonId);
+        const pokemonName = randomPokemon.name;
+        const pokemonData = await getPokemonById(pokemonId);
+        const pokemonHabitat = await getPokemonHabitat(pokemonId, pokemonName, pokemonData);
         if (pokemonHabitat) {
           habitat = pokemonHabitat;
-          pokemonWithHabitat = await getPokemonById(pokemonId);
+          pokemonWithHabitat = pokemonData;
           break;
         }
       }

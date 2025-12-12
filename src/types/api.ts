@@ -71,6 +71,10 @@ export const PokemonSchema = z.object({
   stats: z.array(PokemonStatSchema),
   abilities: z.array(PokemonAbilitySchema),
   moves: z.array(PokemonMoveSchema),
+  species: z.object({
+    name: z.string(),
+    url: z.string().url(),
+  }).optional(),
 });
 
 export const PokemonListItemSchema = z.object({

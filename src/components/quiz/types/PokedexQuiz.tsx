@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getRandomPokemonWithFlavorText, generateWrongPokemonNames } from "@/lib/api/quizData";
-import { formatPokemonName, truncateFlavorText } from "@/lib/utils/quizHelpers";
+import { getRandomPokemonWithFlavorText } from "@/lib/api/quizData";
+import { formatPokemonName, truncateFlavorText, generateWrongPokemonNames } from "@/lib/utils/quizHelpers";
 import type { Pokemon } from "@/types/api";
 
 interface PokedexQuizProps {

@@ -1,19 +1,44 @@
 "use client";
 
-"use client";
-
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getPokemonById } from "@/lib/api/pokemon";
 import type { Pokemon } from "@/types/api";
 
 const featuredPokemonIds = [25, 6, 1, 150]; // Pikachu, Charizard, Bulbasaur, Mewtwo
 
+interface Particle {
+  width: number;
+  height: number;
+  left: string;
+  top: string;
+  duration: number;
+  delay: number;
+}
+
 export function HeroSection() {
   const [featuredPokemon, setFeaturedPokemon] = useState<Pokemon | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Generate particle positions only on client side to avoid hydration mismatch
+  const particles = useMemo<Particle[]>(() => {
+    if (!isMounted) return [];
+    return Array.from({ length: 20 }, () => ({
+      width: Math.random() * 100 + 50,
+      height: Math.random() * 100 + 50,
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      duration: 3 + Math.random() * 2,
+      delay: Math.random() * 2,
+    }));
+  }, [isMounted]);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     const loadPokemon = async () => {
@@ -40,30 +65,32 @@ export function HeroSection() {
   return (
     <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 dark:from-blue-900 dark:via-purple-900 dark:to-pink-900">
       {/* Animated background particles */}
-      <div className="absolute inset-0 overflow-hidden">
-        {[...Array(20)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute rounded-full bg-white/20"
-            style={{
-              width: Math.random() * 100 + 50,
-              height: Math.random() * 100 + 50,
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-            animate={{
-              y: [0, -30, 0],
-              x: [0, 20, 0],
-              opacity: [0.3, 0.6, 0.3],
-            }}
-            transition={{
-              duration: 3 + Math.random() * 2,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
-          />
-        ))}
-      </div>
+      {isMounted && (
+        <div className="absolute inset-0 overflow-hidden">
+          {particles.map((particle, i) => (
+            <motion.div
+              key={i}
+              className="absolute rounded-full bg-white/20"
+              style={{
+                width: particle.width,
+                height: particle.height,
+                left: particle.left,
+                top: particle.top,
+              }}
+              animate={{
+                y: [0, -30, 0],
+                x: [0, 20, 0],
+                opacity: [0.3, 0.6, 0.3],
+              }}
+              transition={{
+                duration: particle.duration,
+                repeat: Infinity,
+                delay: particle.delay,
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="relative container mx-auto px-4 py-20 md:py-32">
         <div className="grid md:grid-cols-2 gap-12 items-center">

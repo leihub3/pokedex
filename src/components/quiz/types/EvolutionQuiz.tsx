@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getRandomPokemon, getPokemonNextEvolution, generateWrongPokemonNames } from "@/lib/api/quizData";
-import { formatPokemonName } from "@/lib/utils/quizHelpers";
+import { getRandomPokemon, getPokemonNextEvolution } from "@/lib/api/quizData";
+import { formatPokemonName, generateWrongPokemonNames } from "@/lib/utils/quizHelpers";
 import type { Pokemon } from "@/types/api";
 
 interface EvolutionQuizProps {
@@ -19,10 +19,13 @@ export function EvolutionQuiz({ onAnswer, selectedAnswer, isLoading, round }: Ev
 
   const loadQuestion = useCallback(async () => {
     try {
+      // Clear previous state first to prevent showing old options with new Pokemon
+      setCurrentPokemon(null);
+      setOptions([]);
+      setCorrectAnswer(null);
+
       const pokemon = await getRandomPokemon();
       if (!pokemon) return;
-
-      setCurrentPokemon(pokemon);
 
       const evolutions = await getPokemonNextEvolution(pokemon.id);
       if (!evolutions || evolutions.length === 0) {
@@ -33,13 +36,20 @@ export function EvolutionQuiz({ onAnswer, selectedAnswer, isLoading, round }: Ev
 
       // Pick first evolution (or random if multiple)
       const evolution = evolutions[Math.floor(Math.random() * evolutions.length)];
-      setCorrectAnswer(evolution);
-
+      
       const wrongAnswers = await generateWrongPokemonNames(evolution, 3);
       const allOptions = [evolution, ...wrongAnswers];
+      
+      // Update all state together atomically
+      setCurrentPokemon(pokemon);
+      setCorrectAnswer(evolution);
       setOptions(allOptions.sort(() => Math.random() - 0.5));
     } catch (error) {
       console.error("Error loading evolution question:", error);
+      // Reset state on error
+      setCurrentPokemon(null);
+      setOptions([]);
+      setCorrectAnswer(null);
     }
   }, []);
 

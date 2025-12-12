@@ -28,11 +28,17 @@ export function LegendaryQuiz({ onAnswer, selectedAnswer, isLoading, round }: Le
       let mythicalPokemon: Pokemon[] = [];
 
       for (const pokemon of allPokemon) {
-        const status = await getPokemonLegendaryStatus(pokemon.id);
+        const status = await getPokemonLegendaryStatus(pokemon.id, pokemon.name, pokemon);
         if (status) {
           if (status.isLegendary) legendaryPokemon.push(pokemon);
           if (status.isMythical) mythicalPokemon.push(pokemon);
         }
+      }
+      
+      // If we didn't find any legendary/mythical after checking all, try again with a fresh batch
+      if (legendaryPokemon.length === 0 && mythicalPokemon.length === 0) {
+        loadQuestion();
+        return;
       }
 
       // Choose question type and correct answer

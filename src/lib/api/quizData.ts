@@ -1,7 +1,7 @@
 import { getPokemonById, getAllPokemonList, getPokemonTypes, getPokemonByType } from "./pokemon";
 import { getMoveById, getMoveList } from "./moves";
 import { getAbilityById, getAbilityList } from "./abilities";
-import { getSpeciesById, getSpeciesByName } from "./species";
+import { getSpeciesById, getSpeciesByName, getSpeciesByUrl } from "./species";
 import { getEvolutionChainFromSpecies } from "./evolution";
 import type { Pokemon, PokemonListItem, PokemonTypeResponse } from "@/types/api";
 import type { Move } from "@/types/api";
@@ -127,7 +127,53 @@ export async function fetchSpeciesData(pokemonId: number): Promise<Species | nul
   try {
     return await getSpeciesById(pokemonId);
   } catch (error) {
-    console.error("Error fetching species data:", error);
+    // Silently handle 404s - some Pokemon don't have species entries
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return null;
+    }
+    // Only log non-404 errors
+    if (!(error instanceof Error && error.message === "NOT_FOUND")) {
+      console.error("Error fetching species data:", error);
+    }
+    return null;
+  }
+}
+
+/**
+ * Fetch species data by Pokemon name (more reliable than ID)
+ */
+export async function fetchSpeciesDataByName(pokemonName: string): Promise<Species | null> {
+  try {
+    return await getSpeciesByName(pokemonName);
+  } catch (error) {
+    // Silently handle 404s - some Pokemon don't have species entries
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return null;
+    }
+    return null;
+  }
+}
+
+/**
+ * Fetch species data from a Pokemon object (most reliable method)
+ * Uses the species URL from the Pokemon object directly
+ */
+export async function fetchSpeciesDataFromPokemon(pokemon: Pokemon): Promise<Species | null> {
+  try {
+    // First try to use the species URL from the Pokemon object (most reliable)
+    if (pokemon.species?.url) {
+      const { getSpeciesByUrl } = await import("./species");
+      return await getSpeciesByUrl(pokemon.species.url);
+    }
+    
+    // Fallback: try by name (remove form suffixes like -mega, -gmax, -alola, etc.)
+    const baseName = pokemon.name.split('-')[0]; // Get base name (e.g., "pikachu" from "pikachu-gmax")
+    return await fetchSpeciesDataByName(baseName);
+  } catch (error) {
+    // Silently handle 404s - some Pokemon don't have species entries
+    if (error instanceof Error && error.message === "NOT_FOUND") {
+      return null;
+    }
     return null;
   }
 }
@@ -188,15 +234,34 @@ export async function getRandomPokemonWithFlavorText(): Promise<{
 /**
  * Get Pokemon generation from species
  */
-export async function getPokemonGeneration(pokemonId: number): Promise<string | null> {
+export async function getPokemonGeneration(
+  pokemonId: number,
+  pokemonName?: string,
+  pokemon?: Pokemon
+): Promise<string | null> {
   try {
-    const species = await fetchSpeciesData(pokemonId);
+    // Try to get species from Pokemon object first (most reliable)
+    let species: Species | null = null;
+    if (pokemon) {
+      species = await fetchSpeciesDataFromPokemon(pokemon);
+    }
+    
+    // Fallback: try by name (remove form suffixes)
+    if (!species && pokemonName) {
+      const baseName = pokemonName.split('-')[0];
+      species = await fetchSpeciesDataByName(baseName);
+    }
+    
+    // Final fallback: try by ID
+    if (!species) {
+      species = await fetchSpeciesData(pokemonId);
+    }
+    
     if (!species) return null;
     
     // Generation name is like "generation-i", "generation-ii", etc.
     return species.generation.name.replace("generation-", "").toUpperCase();
   } catch (error) {
-    console.error("Error getting Pokemon generation:", error);
     return null;
   }
 }
@@ -204,14 +269,33 @@ export async function getPokemonGeneration(pokemonId: number): Promise<string | 
 /**
  * Get Pokemon habitat
  */
-export async function getPokemonHabitat(pokemonId: number): Promise<string | null> {
+export async function getPokemonHabitat(
+  pokemonId: number,
+  pokemonName?: string,
+  pokemon?: Pokemon
+): Promise<string | null> {
   try {
-    const species = await fetchSpeciesData(pokemonId);
+    // Try to get species from Pokemon object first (most reliable)
+    let species: Species | null = null;
+    if (pokemon) {
+      species = await fetchSpeciesDataFromPokemon(pokemon);
+    }
+    
+    // Fallback: try by name (remove form suffixes)
+    if (!species && pokemonName) {
+      const baseName = pokemonName.split('-')[0];
+      species = await fetchSpeciesDataByName(baseName);
+    }
+    
+    // Final fallback: try by ID
+    if (!species) {
+      species = await fetchSpeciesData(pokemonId);
+    }
+    
     if (!species?.habitat) return null;
     
     return species.habitat.name;
   } catch (error) {
-    console.error("Error getting Pokemon habitat:", error);
     return null;
   }
 }
@@ -232,10 +316,16 @@ export async function getAllHabitats(): Promise<string[]> {
       const match = pokemonItem.url.match(/\/pokemon\/(\d+)\//);
       if (!match) continue;
       
-      const pokemonId = parseInt(match[1], 10);
-      const habitat = await getPokemonHabitat(pokemonId);
-      if (habitat) {
-        habitats.add(habitat);
+      try {
+        const pokemonId = parseInt(match[1], 10);
+        const pokemon = await getPokemonById(pokemonId);
+        const habitat = await getPokemonHabitat(pokemonId, pokemonItem.name, pokemon);
+        if (habitat) {
+          habitats.add(habitat);
+        }
+      } catch (error) {
+        // Skip if Pokemon fetch fails
+        continue;
       }
     }
     
@@ -250,10 +340,28 @@ export async function getAllHabitats(): Promise<string[]> {
  * Get Pokemon legendary/mythical status
  */
 export async function getPokemonLegendaryStatus(
-  pokemonId: number
+  pokemonId: number,
+  pokemonName?: string,
+  pokemon?: Pokemon
 ): Promise<{ isLegendary: boolean; isMythical: boolean } | null> {
   try {
-    const species = await fetchSpeciesData(pokemonId);
+    // Try to get species from Pokemon object first (most reliable)
+    let species: Species | null = null;
+    if (pokemon) {
+      species = await fetchSpeciesDataFromPokemon(pokemon);
+    }
+    
+    // Fallback: try by name (remove form suffixes)
+    if (!species && pokemonName) {
+      const baseName = pokemonName.split('-')[0];
+      species = await fetchSpeciesDataByName(baseName);
+    }
+    
+    // Final fallback: try by ID
+    if (!species) {
+      species = await fetchSpeciesData(pokemonId);
+    }
+    
     if (!species) return null;
     
     return {
@@ -261,7 +369,7 @@ export async function getPokemonLegendaryStatus(
       isMythical: species.is_mythical,
     };
   } catch (error) {
-    console.error("Error getting legendary status:", error);
+    // Silently return null for any errors
     return null;
   }
 }
@@ -269,14 +377,33 @@ export async function getPokemonLegendaryStatus(
 /**
  * Get Pokemon capture rate
  */
-export async function getPokemonCaptureRate(pokemonId: number): Promise<number | null> {
+export async function getPokemonCaptureRate(
+  pokemonId: number,
+  pokemonName?: string,
+  pokemon?: Pokemon
+): Promise<number | null> {
   try {
-    const species = await fetchSpeciesData(pokemonId);
+    // Try to get species from Pokemon object first (most reliable)
+    let species: Species | null = null;
+    if (pokemon) {
+      species = await fetchSpeciesDataFromPokemon(pokemon);
+    }
+    
+    // Fallback: try by name (remove form suffixes)
+    if (!species && pokemonName) {
+      const baseName = pokemonName.split('-')[0];
+      species = await fetchSpeciesDataByName(baseName);
+    }
+    
+    // Final fallback: try by ID
+    if (!species) {
+      species = await fetchSpeciesData(pokemonId);
+    }
+    
     if (!species) return null;
     
     return species.capture_rate;
   } catch (error) {
-    console.error("Error getting capture rate:", error);
     return null;
   }
 }

@@ -27,7 +27,7 @@ export function GenerationQuiz({ onAnswer, selectedAnswer, isLoading, round }: G
 
       setCurrentPokemon(pokemon);
 
-      const generation = await getPokemonGeneration(pokemon.id);
+      const generation = await getPokemonGeneration(pokemon.id, pokemon.name, pokemon);
       if (!generation) {
         // Retry if no generation found
         loadQuestion();
