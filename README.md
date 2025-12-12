@@ -41,7 +41,7 @@ A modern, full-featured Pokémon Explorer web application built with Next.js 14,
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd pokemon-app
+cd pokedex
 ```
 
 2. Install dependencies:
