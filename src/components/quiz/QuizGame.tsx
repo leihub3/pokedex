@@ -6,6 +6,7 @@ import { getAllPokemonList } from "@/lib/api/pokemon";
 import { getPokemonById } from "@/lib/api/pokemon";
 import { useQuizStore } from "@/store/quizStore";
 import { LoaderSpinner } from "@/components/ui/LoaderSpinner";
+import { QuizHistory } from "./QuizHistory";
 import type { PokemonListItem, Pokemon } from "@/types/api";
 
 export function QuizGame() {
@@ -18,7 +19,8 @@ export function QuizGame() {
   const [isGameActive, setIsGameActive] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { addScore } = useQuizStore();
+  const [showHistory, setShowHistory] = useState(false);
+  const { addScore, getStats } = useQuizStore();
 
   useEffect(() => {
     const loadPokemon = async () => {
@@ -94,11 +96,14 @@ export function QuizGame() {
   useEffect(() => {
     if (isGameActive && timeLeft === 0) {
       setIsGameActive(false);
+      const totalQuestions = round + 1;
+      const accuracy = totalQuestions > 0 ? (score / totalQuestions) * 100 : 0;
       addScore({
         score,
-        total: round + 1,
+        total: totalQuestions,
         time: 30,
         date: new Date().toISOString(),
+        accuracy,
       });
     }
   }, [timeLeft, isGameActive, score, round, addScore]);
@@ -121,11 +126,14 @@ export function QuizGame() {
 
   const endGame = () => {
     setIsGameActive(false);
+    const totalQuestions = round + 1;
+    const accuracy = totalQuestions > 0 ? (score / totalQuestions) * 100 : 0;
     addScore({
       score,
-      total: round + 1,
+      total: totalQuestions,
       time: 30 - timeLeft,
       date: new Date().toISOString(),
+      accuracy,
     });
   };
 
@@ -138,14 +146,66 @@ export function QuizGame() {
   }
 
   if (!isGameActive) {
+    const stats = getStats();
     return (
-      <div className="text-center">
-        <button
-          onClick={startGame}
-          className="rounded-lg bg-blue-600 px-8 py-4 text-xl font-semibold text-white hover:bg-blue-700"
-        >
-          Start Quiz
-        </button>
+      <div className="space-y-6">
+        <div className="text-center">
+          <button
+            onClick={startGame}
+            className="rounded-lg bg-blue-600 px-8 py-4 text-xl font-semibold text-white hover:bg-blue-700 transition-all hover:scale-105"
+          >
+            Start Quiz
+          </button>
+        </div>
+        
+        {/* Quick Stats */}
+        {stats.totalGames > 0 && (
+          <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-800">
+            <div className="flex items-center justify-center gap-6 text-center">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Best Score</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {stats.bestScore}
+                </p>
+              </div>
+              <div className="h-12 w-px bg-gray-300 dark:bg-gray-700"></div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Total Games</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {stats.totalGames}
+                </p>
+              </div>
+              <div className="h-12 w-px bg-gray-300 dark:bg-gray-700"></div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Current Streak</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {stats.currentStreak} 🔥
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* History Toggle Button */}
+        <div className="flex justify-center">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="rounded-lg border border-gray-300 px-6 py-2 text-gray-700 transition-all hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            {showHistory ? '👆 Hide History' : '👇 View History & Stats'}
+          </button>
+        </div>
+        
+        {/* History Component */}
+        {showHistory && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <QuizHistory />
+          </motion.div>
+        )}
       </div>
     );
   }
