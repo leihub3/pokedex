@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useTeamStore } from "@/store/teamStore";
 import { TeamStatsChart } from "@/components/charts/TeamStatsChart";
@@ -9,7 +9,8 @@ import { TypeWeaknessSummary } from "./TypeWeaknessSummary";
 import { TeamRecommendations } from "./TeamRecommendations";
 import { getPokemonById, getAllPokemonList } from "@/lib/api/pokemon";
 import { LoaderSpinner } from "@/components/ui/LoaderSpinner";
-import type { Pokemon } from "@/types/api";
+import { AutocompleteInput } from "@/components/ui/AutocompleteInput";
+import type { Pokemon, PokemonListItem } from "@/types/api";
 
 export function TeamBuilderClient() {
   const { team, addToTeam, removeFromTeam, clearTeam, getTeamStats } =
@@ -18,14 +19,34 @@ export function TeamBuilderClient() {
   const [searchResults, setSearchResults] = useState<Pokemon[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [draggingSlot, setDraggingSlot] = useState<number | null>(null);
+  const [allPokemonNames, setAllPokemonNames] = useState<string[]>([]);
+  const [isLoadingNames, setIsLoadingNames] = useState(true);
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+  // Load all Pokémon names for autocomplete
+  useEffect(() => {
+    const loadPokemonNames = async () => {
+      try {
+        const response = await getAllPokemonList();
+        const names = response.results.map((item: PokemonListItem) => item.name);
+        setAllPokemonNames(names);
+      } catch (error) {
+        console.error("Error loading Pokémon names:", error);
+      } finally {
+        setIsLoadingNames(false);
+      }
+    };
+    loadPokemonNames();
+  }, []);
+
+  const handleSearch = async (searchTerm?: string) => {
+    const term = searchTerm || searchQuery;
+    if (!term.trim()) return;
     setIsSearching(true);
     try {
       // Try to search by name or ID
-      const pokemon = await getPokemonById(searchQuery.toLowerCase());
+      const pokemon = await getPokemonById(term.toLowerCase());
       setSearchResults([pokemon]);
+      setSearchQuery(""); // Clear search after successful result
     } catch (error) {
       console.error("Error searching pokemon:", error);
       setSearchResults([]);
@@ -56,17 +77,19 @@ export function TeamBuilderClient() {
     <div className="space-y-8">
       {/* Search */}
       <div className="flex gap-4">
-        <input
-          type="text"
+        <AutocompleteInput
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+          onChange={setSearchQuery}
+          onSelect={handleSearch}
+          options={allPokemonNames}
           placeholder="Search Pokémon by name or ID..."
-          className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+          className="flex-1"
+          maxSuggestions={8}
+          disabled={isLoadingNames || isSearching}
         />
         <button
-          onClick={handleSearch}
-          disabled={isSearching}
+          onClick={() => handleSearch()}
+          disabled={isSearching || isLoadingNames}
           className="rounded-lg bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
         >
           {isSearching ? <LoaderSpinner size="sm" /> : "Search"}

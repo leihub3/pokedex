@@ -16,6 +16,7 @@ export function TypeExplorerClient({ initialTypes }: TypeExplorerClientProps) {
   const [selectedType, setSelectedType] = useState<PokemonTypeResponse | null>(
     initialTypes[0] ?? null
   );
+  const [showAllPokemon, setShowAllPokemon] = useState(false);
 
   return (
     <div className="space-y-8">
@@ -34,7 +35,10 @@ export function TypeExplorerClient({ initialTypes }: TypeExplorerClientProps) {
             <motion.button
               key={type.id}
               variants={staggerItem}
-              onClick={() => setSelectedType(type)}
+              onClick={() => {
+                setSelectedType(type);
+                setShowAllPokemon(false);
+              }}
               className={`${colors.bg} ${colors.text} relative overflow-hidden rounded-lg p-4 text-center font-semibold transition-all ${
                 isSelected
                   ? "ring-4 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900"
@@ -80,25 +84,42 @@ export function TypeExplorerClient({ initialTypes }: TypeExplorerClientProps) {
               Pokémon with this type ({selectedType.pokemon.length})
             </h3>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-              {selectedType.pokemon.slice(0, 24).map((pokemonEntry) => {
-                const pokemonId = pokemonEntry.pokemon.url.match(/\/pokemon\/(\d+)\//)?.[1];
-                return (
-                  <motion.a
-                    key={pokemonEntry.pokemon.name}
-                    href={`/pokemon/${pokemonId}`}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="rounded-lg border border-gray-200 bg-gray-50 p-2 text-center text-sm capitalize transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800"
-                  >
-                    {pokemonEntry.pokemon.name.replace(/-/g, " ")}
-                  </motion.a>
-                );
-              })}
+              {selectedType.pokemon
+                .slice(0, showAllPokemon ? selectedType.pokemon.length : 24)
+                .map((pokemonEntry) => {
+                  const pokemonId = pokemonEntry.pokemon.url.match(/\/pokemon\/(\d+)\//)?.[1];
+                  return (
+                    <motion.a
+                      key={pokemonEntry.pokemon.name}
+                      href={`/pokemon/${pokemonId}`}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="rounded-lg border border-gray-200 bg-gray-50 p-2 text-center text-sm capitalize transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800"
+                    >
+                      {pokemonEntry.pokemon.name.replace(/-/g, " ")}
+                    </motion.a>
+                  );
+                })}
             </div>
-            {selectedType.pokemon.length > 24 && (
-              <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-                And {selectedType.pokemon.length - 24} more...
-              </p>
+            {selectedType.pokemon.length > 24 && !showAllPokemon && (
+              <motion.button
+                onClick={() => setShowAllPokemon(true)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="mt-4 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                Show all {selectedType.pokemon.length} Pokémon ({selectedType.pokemon.length - 24} more)
+              </motion.button>
+            )}
+            {showAllPokemon && selectedType.pokemon.length > 24 && (
+              <motion.button
+                onClick={() => setShowAllPokemon(false)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="mt-4 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                Show less
+              </motion.button>
             )}
           </div>
         </motion.div>

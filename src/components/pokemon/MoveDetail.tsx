@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
@@ -10,6 +11,7 @@ interface MoveDetailProps {
 }
 
 export function MoveDetail({ move }: MoveDetailProps) {
+  const [showAllPokemon, setShowAllPokemon] = useState(false);
   const englishEffect = move.effect_entries.find(
     (entry) => entry.language.name === "en"
   );
@@ -93,23 +95,40 @@ export function MoveDetail({ move }: MoveDetailProps) {
             Learned by ({move.learned_by_pokemon.length} Pokémon)
           </h2>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-            {move.learned_by_pokemon.slice(0, 24).map((pokemon) => {
-              const pokemonId = pokemon.url.match(/\/pokemon\/(\d+)\//)?.[1];
-              return (
-                <Link
-                  key={pokemon.name}
-                  href={`/pokemon/${pokemonId}`}
-                  className="rounded-lg border border-gray-200 bg-gray-50 p-2 text-center text-sm capitalize transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800"
-                >
-                  {pokemon.name.replace(/-/g, " ")}
-                </Link>
-              );
-            })}
+            {move.learned_by_pokemon
+              .slice(0, showAllPokemon ? move.learned_by_pokemon.length : 24)
+              .map((pokemon) => {
+                const pokemonId = pokemon.url.match(/\/pokemon\/(\d+)\//)?.[1];
+                return (
+                  <Link
+                    key={pokemon.name}
+                    href={`/pokemon/${pokemonId}`}
+                    className="rounded-lg border border-gray-200 bg-gray-50 p-2 text-center text-sm capitalize transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800"
+                  >
+                    {pokemon.name.replace(/-/g, " ")}
+                  </Link>
+                );
+              })}
           </div>
-          {move.learned_by_pokemon.length > 24 && (
-            <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-              And {move.learned_by_pokemon.length - 24} more...
-            </p>
+          {move.learned_by_pokemon.length > 24 && !showAllPokemon && (
+            <motion.button
+              onClick={() => setShowAllPokemon(true)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="mt-4 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Show all {move.learned_by_pokemon.length} Pokémon ({move.learned_by_pokemon.length - 24} more)
+            </motion.button>
+          )}
+          {showAllPokemon && move.learned_by_pokemon.length > 24 && (
+            <motion.button
+              onClick={() => setShowAllPokemon(false)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="mt-4 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Show less
+            </motion.button>
           )}
         </div>
       )}
