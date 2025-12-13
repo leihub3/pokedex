@@ -12,10 +12,10 @@ const features = [
     color: "from-blue-500 to-cyan-500",
   },
   {
-    title: "Battle Simulator",
-    description: "See who would win in battle",
+    title: "Battle Arena",
+    description: "Watch Pokémon battle with animations",
     icon: "⚔️",
-    href: "/battle-simulator",
+    href: "/battle",
     color: "from-red-500 to-orange-500",
   },
   {
