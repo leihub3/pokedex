@@ -11,11 +11,19 @@ interface BattleLogProps {
 }
 
 export function BattleLog({ log, pokemon1Name, pokemon2Name }: BattleLogProps) {
-  const logEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Auto-scroll to bottom when new events are added
-    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Auto-scroll to bottom within the log container only (not the whole page)
+    // This prevents the page from scrolling and losing focus on the battle opponents
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      // Use scrollTo on the container instead of scrollIntoView to avoid page scroll
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   }, [log]);
 
   const formatEvent = (event: BattleEvent): string => {
@@ -95,7 +103,10 @@ export function BattleLog({ log, pokemon1Name, pokemon2Name }: BattleLogProps) {
           Battle Log
         </h3>
       </div>
-      <div className="max-h-64 overflow-y-auto p-4">
+      <div 
+        ref={scrollContainerRef}
+        className="max-h-64 overflow-y-auto p-4"
+      >
         <AnimatePresence initial={false}>
           {log.map((event, index) => (
             <motion.div
@@ -110,7 +121,6 @@ export function BattleLog({ log, pokemon1Name, pokemon2Name }: BattleLogProps) {
             </motion.div>
           ))}
         </AnimatePresence>
-        <div ref={logEndRef} />
       </div>
     </div>
   );

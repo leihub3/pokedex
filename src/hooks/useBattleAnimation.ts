@@ -3,9 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import type { BattleEvent, BattleState } from "@/battle-engine";
 
+export type AnimationSpeed = 1 | 2 | 4;
+
 interface UseBattleAnimationReturn {
   isAnimating: boolean;
   currentEventIndex: number;
+  speedMultiplier: AnimationSpeed;
+  setSpeedMultiplier: (speed: AnimationSpeed) => void;
   startAnimations: (events: BattleEvent[]) => Promise<void>;
   reset: () => void;
 }
@@ -27,33 +31,45 @@ const ANIMATION_TIMINGS = {
  * Hook to manage battle animation queue
  * Plays animations sequentially for battle events
  */
-export function useBattleAnimation(): UseBattleAnimationReturn {
+export function useBattleAnimation(speedMultiplier: AnimationSpeed = 1): UseBattleAnimationReturn {
   const [isAnimating, setIsAnimating] = useState(false);
   const [currentEventIndex, setCurrentEventIndex] = useState(0);
+  const [speed, setSpeed] = useState<AnimationSpeed>(speedMultiplier);
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
    * Get animation duration for an event type
+   * Applies speed multiplier to reduce duration
    */
   const getEventDuration = (event: BattleEvent): number => {
+    let baseDuration: number;
     switch (event.type) {
       case "move_used":
-        return ANIMATION_TIMINGS.moveUsed;
+        baseDuration = ANIMATION_TIMINGS.moveUsed;
+        break;
       case "damage_dealt":
-        return ANIMATION_TIMINGS.damage;
+        baseDuration = ANIMATION_TIMINGS.damage;
+        break;
       case "status_applied":
       case "status_damage":
       case "status_healed":
-        return ANIMATION_TIMINGS.status;
+        baseDuration = ANIMATION_TIMINGS.status;
+        break;
       case "stat_changed":
-        return ANIMATION_TIMINGS.statChange;
+        baseDuration = ANIMATION_TIMINGS.statChange;
+        break;
       case "faint":
-        return ANIMATION_TIMINGS.faint;
+        baseDuration = ANIMATION_TIMINGS.faint;
+        break;
       case "turn_start":
-        return ANIMATION_TIMINGS.turnStart;
+        baseDuration = ANIMATION_TIMINGS.turnStart;
+        break;
       default:
-        return ANIMATION_TIMINGS.default;
+        baseDuration = ANIMATION_TIMINGS.default;
     }
+    
+    // Apply speed multiplier (higher multiplier = faster = shorter duration)
+    return Math.max(50, baseDuration / speed); // Minimum 50ms for any animation
   };
 
   /**
@@ -106,6 +122,8 @@ export function useBattleAnimation(): UseBattleAnimationReturn {
   return {
     isAnimating,
     currentEventIndex,
+    speedMultiplier: speed,
+    setSpeedMultiplier: setSpeed,
     startAnimations,
     reset,
   };
