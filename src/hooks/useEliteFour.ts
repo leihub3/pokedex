@@ -4,7 +4,9 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import type { Pokemon as APIPokemon } from "@/types/api";
 import { useBattle, type UseBattleReturn } from "./useBattle";
 import { getPokemonById } from "@/lib/api/pokemon";
+import { getPokemonMoves } from "@/lib/pokemon-api/normalizeForBattle";
 import type { EliteFourConfig, EliteFourMember, EliteFourChampion } from "@/data/eliteFour";
+import type { Move as EngineMove } from "@/battle-engine";
 
 export type EliteFourStatus = "lobby" | "battling" | "defeated" | "victory";
 
@@ -22,7 +24,7 @@ export interface UseEliteFourReturn {
   battle: UseBattleReturn;
   
   // Actions
-  startRun: (userPokemon: APIPokemon, config: EliteFourConfig) => Promise<void>;
+  startRun: (userPokemon: APIPokemon, config: EliteFourConfig, selectedMoves?: EngineMove[]) => Promise<void>;
   startNextBattle: () => Promise<void>;
   onBattleWin: () => void;
   onBattleLoss: () => void;
@@ -44,6 +46,7 @@ export function useEliteFour(): UseEliteFourReturn {
   const [config, setConfig] = useState<EliteFourConfig | null>(null);
   const [defeatedOpponents, setDefeatedOpponents] = useState<string[]>([]);
   const [opponentPokemon, setOpponentPokemon] = useState<APIPokemon | null>(null);
+  const [userSelectedMoves, setUserSelectedMoves] = useState<EngineMove[] | null>(null);
   
   // Use battle hook for individual battles
   const battle = useBattle();
@@ -72,12 +75,13 @@ export function useEliteFour(): UseEliteFourReturn {
    * Start Elite Four challenge
    */
   const startRun = useCallback(
-    async (pokemon: APIPokemon, eliteFourConfig: EliteFourConfig) => {
+    async (pokemon: APIPokemon, eliteFourConfig: EliteFourConfig, selectedMoves?: EngineMove[]) => {
       setUserPokemon(pokemon);
       setConfig(eliteFourConfig);
       setDefeatedOpponents([]);
       setOpponentPokemon(null);
       setCurrentOpponentIndex(0);
+      setUserSelectedMoves(selectedMoves || null);
       setStatus("battling");
       // Battle will start via useEffect when currentOpponentIndex changes
     },
@@ -108,15 +112,25 @@ export function useEliteFour(): UseEliteFourReturn {
       // Reset battle hook for fresh battle (ensures HP resets)
       battle.resetBattle();
       
+      // Get opponent moves (always fetch, user might have selected moves)
+      const opponentMoves = await getPokemonMoves(opponentPoke, 4);
+      
       // Start battle - user is always pokemon1 (index 0)
+      // Use selected moves for user if available, otherwise battle will fetch automatically
       const seed = Date.now() + currentOpponentIndex;
-      await battle.startBattle(userPokemon, opponentPoke, seed);
+      await battle.startBattle(
+        userPokemon, 
+        opponentPoke, 
+        seed,
+        userSelectedMoves || undefined,
+        opponentMoves.length > 0 ? opponentMoves : undefined
+      );
       
       console.log("✓ Started battle for opponent index:", currentOpponentIndex, opponent.title);
     } catch (error) {
       console.error("Failed to start Elite Four battle:", error);
     }
-  }, [config, currentOpponentIndex, userPokemon, battle, getCurrentOpponent]);
+  }, [config, currentOpponentIndex, userPokemon, userSelectedMoves, battle, getCurrentOpponent]);
   
   /**
    * Handle battle win - advance to next opponent or complete challenge
@@ -224,6 +238,7 @@ export function useEliteFour(): UseEliteFourReturn {
     setConfig(null);
     setDefeatedOpponents([]);
     setOpponentPokemon(null);
+    setUserSelectedMoves(null);
     battleProcessedRef.current = null; // Reset processed battles tracker
     lastProcessedOpponentIndexRef.current = null; // Reset last processed opponent index
     battle.resetBattle();

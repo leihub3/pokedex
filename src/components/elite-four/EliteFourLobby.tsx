@@ -6,13 +6,16 @@ import { getPokemonById, getAllPokemonList } from "@/lib/api/pokemon";
 import { AutocompleteInput } from "@/components/ui/AutocompleteInput";
 import { LoaderSpinner } from "@/components/ui/LoaderSpinner";
 import { Badge } from "@/components/ui/Badge";
-import type { Pokemon, PokemonListItem } from "@/types/api";
+import { MoveSelectionScreen } from "@/components/battle/MoveSelectionScreen";
+import { getAvailablePokemonMoves } from "@/lib/pokemon-api/normalizeForBattle";
+import type { Pokemon, PokemonListItem, Move as APIMove } from "@/types/api";
 import type { EliteFourConfig } from "@/data/eliteFour";
+import type { Move as EngineMove } from "@/battle-engine";
 import Image from "next/image";
 
 interface EliteFourLobbyProps {
   config: EliteFourConfig;
-  onStart: (userPokemon: Pokemon) => void;
+  onStart: (userPokemon: Pokemon, selectedMoves: EngineMove[]) => void;
   isStarting: boolean;
 }
 
@@ -28,6 +31,9 @@ export function EliteFourLobby({
   const [allPokemonNames, setAllPokemonNames] = useState<string[]>([]);
   const [isLoadingNames, setIsLoadingNames] = useState(true);
   const [opponentPokemon, setOpponentPokemon] = useState<Pokemon[]>([]);
+  const [availableMoves, setAvailableMoves] = useState<APIMove[]>([]);
+  const [isLoadingMoves, setIsLoadingMoves] = useState(false);
+  const [showMoveSelection, setShowMoveSelection] = useState(false);
 
   // Load all Pokémon names for autocomplete
   useEffect(() => {
@@ -68,9 +74,28 @@ export function EliteFourLobby({
     if (!term.trim()) return;
     setIsLoadingPokemon(true);
     setError(null);
+    setShowMoveSelection(false);
+    setAvailableMoves([]);
     try {
       const pokemon = await getPokemonById(term.toLowerCase());
       setUserPokemon(pokemon);
+      
+      // Load available moves for move selection
+      setIsLoadingMoves(true);
+      try {
+        const moves = await getAvailablePokemonMoves(pokemon);
+        setAvailableMoves(moves);
+        if (moves.length > 0) {
+          setShowMoveSelection(true);
+        } else {
+          setError("This Pokémon has no available moves.");
+        }
+      } catch (moveError) {
+        console.error("Error loading moves:", moveError);
+        setError("Failed to load moves for this Pokémon.");
+      } finally {
+        setIsLoadingMoves(false);
+      }
     } catch (err) {
       if (err instanceof Error && err.message === "NOT_FOUND") {
         setError(`Pokémon "${term}" not found.`);
@@ -78,18 +103,27 @@ export function EliteFourLobby({
         setError("Failed to fetch Pokémon.");
       }
       setUserPokemon(null);
+      setShowMoveSelection(false);
+      setAvailableMoves([]);
     } finally {
       setIsLoadingPokemon(false);
     }
   };
 
-  const handleStart = () => {
-    if (userPokemon) {
-      onStart(userPokemon);
+  const handleMoveConfirm = (selectedMoves: EngineMove[]) => {
+    if (userPokemon && selectedMoves.length === 4) {
+      onStart(userPokemon, selectedMoves);
     }
   };
 
-  const canStart = userPokemon !== null && !isStarting;
+  const handleMoveCancel = () => {
+    setShowMoveSelection(false);
+    setUserPokemon(null);
+    setSearch("");
+    setAvailableMoves([]);
+  };
+
+  const canStart = userPokemon !== null && !isStarting && !showMoveSelection;
 
   return (
     <div className="space-y-8 p-4 md:p-8">
@@ -260,28 +294,38 @@ export function EliteFourLobby({
         )}
       </motion.div>
 
-      {/* Start Button */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="text-center"
-      >
-        <button
-          onClick={handleStart}
-          disabled={!canStart}
-          className="btn-primary w-full max-w-md text-lg font-bold"
+      {/* Move Selection Screen */}
+      {showMoveSelection && userPokemon && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="rounded-lg border border-gray-200 bg-white p-6 shadow-md dark:border-gray-700 dark:bg-gray-800"
         >
-          {isStarting ? (
-            <>
-              <LoaderSpinner size="sm" />
-              <span className="ml-2">Starting Challenge...</span>
-            </>
-          ) : (
-            "Begin Challenge"
+          <MoveSelectionScreen
+            availableMoves={availableMoves}
+            onConfirm={handleMoveConfirm}
+            onCancel={handleMoveCancel}
+            isLoading={isStarting || isLoadingMoves}
+          />
+        </motion.div>
+      )}
+
+      {/* Start Button (only shown when not selecting moves) */}
+      {!showMoveSelection && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-center"
+        >
+          {userPokemon && !isLoadingMoves && (
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+              Select your Pokémon to choose moves
+            </p>
           )}
-        </button>
-      </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 }

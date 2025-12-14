@@ -32,7 +32,9 @@ export interface UseBattleReturn {
   startBattle: (
     pokemon1: APIPokemon,
     pokemon2: APIPokemon,
-    seed?: number
+    seed?: number,
+    pokemon1Moves?: EngineMove[],
+    pokemon2Moves?: EngineMove[]
   ) => Promise<void>;
   executeTurn: (move1Index: number, move2Index: number) => void;
   resetBattle: () => void;
@@ -63,13 +65,15 @@ export function useBattle(): UseBattleReturn {
 
   /**
    * Start a new battle
-   * Fetches moves and normalizes Pokemon data
+   * Fetches moves and normalizes Pokemon data (or uses provided moves)
    */
   const startBattle = useCallback(
     async (
       apiPokemon1: APIPokemon,
       apiPokemon2: APIPokemon,
-      seed?: number
+      seed?: number,
+      providedMoves1?: EngineMove[],
+      providedMoves2?: EngineMove[]
     ) => {
       setIsLoading(true);
       try {
@@ -77,15 +81,27 @@ export function useBattle(): UseBattleReturn {
         const enginePokemon1 = normalizePokemonForBattle(apiPokemon1);
         const enginePokemon2 = normalizePokemonForBattle(apiPokemon2);
 
-        // Fetch moves for both Pokemon
-        const [moves1, moves2] = await Promise.all([
-          getPokemonMoves(apiPokemon1, 4),
-          getPokemonMoves(apiPokemon2, 4),
-        ]);
+        // Use provided moves if available, otherwise fetch moves
+        let moves1: EngineMove[];
+        let moves2: EngineMove[];
+
+        if (providedMoves1 && providedMoves2) {
+          // Use provided moves
+          moves1 = providedMoves1;
+          moves2 = providedMoves2;
+        } else {
+          // Fetch moves for both Pokemon
+          const [fetchedMoves1, fetchedMoves2] = await Promise.all([
+            getPokemonMoves(apiPokemon1, 4),
+            getPokemonMoves(apiPokemon2, 4),
+          ]);
+          moves1 = fetchedMoves1;
+          moves2 = fetchedMoves2;
+        }
 
         // Ensure we have at least one move per Pokemon
         if (moves1.length === 0 || moves2.length === 0) {
-          throw new Error("Pokemon must have at least one damaging move");
+          throw new Error("Pokemon must have at least one move");
         }
 
         // Create battle using engine

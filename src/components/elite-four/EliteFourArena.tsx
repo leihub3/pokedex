@@ -191,8 +191,8 @@ export function EliteFourArena() {
   // Render based on status
   if (status === "lobby") {
     const currentConfig = config || KANTO_ELITE_FOUR;
-    const handleStart = (userPokemon: APIPokemon) => {
-      startRun(userPokemon, currentConfig);
+    const handleStart = (userPokemon: APIPokemon, selectedMoves: import("@/battle-engine").Move[]) => {
+      startRun(userPokemon, currentConfig, selectedMoves);
     };
     
     return (
