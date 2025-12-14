@@ -17,6 +17,7 @@ const navItems = [
   { href: "/pokemon/generations", label: "Generations" },
   { href: "/team-builder", label: "Team Builder" },
   { href: "/battle", label: "Battle" },
+  { href: "/elite-four", label: "Elite Four" },
   { href: "/quiz", label: "Quiz" },
   { href: "/favorites", label: "Favorites" },
 ];
