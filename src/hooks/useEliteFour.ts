@@ -7,6 +7,7 @@ import { getPokemonById } from "@/lib/api/pokemon";
 import { getPokemonMoves } from "@/lib/pokemon-api/normalizeForBattle";
 import type { EliteFourConfig, EliteFourMember, EliteFourChampion } from "@/data/eliteFour";
 import type { Move as EngineMove } from "@/battle-engine";
+import { useEliteFourCareerStore } from "@/store/eliteFourCareerStore";
 
 export type EliteFourStatus = "lobby" | "battling" | "defeated" | "victory";
 
@@ -42,6 +43,14 @@ export interface UseEliteFourReturn {
  * Orchestrates sequential battles using the battle engine
  */
 export function useEliteFour(): UseEliteFourReturn {
+  const {
+    gameMode,
+    completeRegion,
+    completeMasterModeRegion,
+    getMasterModeCurrentRegion,
+    getMasterModeProgress,
+  } = useEliteFourCareerStore();
+  
   const [status, setStatus] = useState<EliteFourStatus>("lobby");
   const [currentOpponentIndex, setCurrentOpponentIndex] = useState<number | null>(null);
   const [userPokemon, setUserPokemon] = useState<APIPokemon | null>(null);
@@ -230,6 +239,21 @@ export function useEliteFour(): UseEliteFourReturn {
         if (isChampion) {
           // Defeated Champion - Victory!
           console.log("✓ Champion defeated! Showing victory screen.");
+          
+          // Track region completion based on mode
+          if (gameMode === "career" && config) {
+            completeRegion(config.id);
+          } else if (gameMode === "master" && config) {
+            completeMasterModeRegion(config.id);
+            
+            // Check if Master Mode is complete
+            const progress = getMasterModeProgress();
+            if (progress.completed >= progress.total) {
+              // Master Mode complete!
+              console.log("🏆 Master Mode completed!");
+            }
+          }
+          
           setStatus("victory");
         } else {
           // Not the champion yet - continue to next opponent

@@ -236,6 +236,7 @@ export function EliteFourArena() {
         config={config}
         userPokemon={userPokemon}
         onRestart={resetRun}
+        onContinueCareer={resetRun} // For now, same as restart - will implement actual continuation later
       />
     );
   }

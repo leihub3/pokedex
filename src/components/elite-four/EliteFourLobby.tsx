@@ -12,6 +12,8 @@ import type { Pokemon, PokemonListItem, Move as APIMove } from "@/types/api";
 import type { EliteFourConfig } from "@/data/eliteFour";
 import { getAllEliteFourConfigs } from "@/data/eliteFour";
 import type { Move as EngineMove } from "@/battle-engine";
+import { useEliteFourCareerStore } from "@/store/eliteFourCareerStore";
+import { EliteFourCareerProgress } from "./EliteFourCareerProgress";
 import Image from "next/image";
 
 interface EliteFourLobbyProps {
@@ -25,11 +27,53 @@ export function EliteFourLobby({
   onStart,
   isStarting,
 }: EliteFourLobbyProps) {
+  const {
+    gameMode,
+    setGameMode,
+    careerProgress,
+    isRegionUnlocked,
+    startCareer,
+    startMasterMode,
+    getMasterModeCurrentRegion,
+  } = useEliteFourCareerStore();
+
   const availableRegions = getAllEliteFourConfigs();
-  const [selectedRegionId, setSelectedRegionId] = useState<string>(
-    initialConfig?.id || "kanto"
-  );
-  const currentConfig = availableRegions.find((r) => r.id === selectedRegionId) || availableRegions[0];
+
+  // In Career Mode, start with current region; in Master Mode, use current Master Mode region
+  const initialRegionId =
+    gameMode === "career" && careerProgress.currentRegion
+      ? careerProgress.currentRegion
+      : gameMode === "master"
+      ? getMasterModeCurrentRegion()?.id || "kanto"
+      : initialConfig?.id || "kanto";
+
+  const [selectedRegionId, setSelectedRegionId] = useState<string>(initialRegionId);
+
+  // Filter regions based on mode
+  const selectableRegions =
+    gameMode === "free"
+      ? availableRegions.filter((r) => isRegionUnlocked(r.id))
+      : gameMode === "career"
+      ? availableRegions.filter(
+          (r) =>
+            isRegionUnlocked(r.id) &&
+            !careerProgress.completedRegions.includes(r.id)
+        )
+      : availableRegions; // Master Mode: all regions
+
+  const currentConfig =
+    availableRegions.find((r) => r.id === selectedRegionId) ||
+    selectableRegions[0] ||
+    availableRegions[0];
+
+  // Update selected region when mode changes
+  useEffect(() => {
+    if (gameMode === "career" && careerProgress.currentRegion) {
+      setSelectedRegionId(careerProgress.currentRegion);
+    } else if (gameMode === "master") {
+      setSelectedRegionId("kanto"); // Start from beginning in Master Mode
+    }
+  }, [gameMode, careerProgress.currentRegion]);
 
   const [userPokemon, setUserPokemon] = useState<Pokemon | null>(null);
   const [search, setSearch] = useState("");
@@ -149,6 +193,69 @@ export function EliteFourLobby({
         </p>
       </motion.div>
 
+      {/* Mode Selector */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.03 }}
+        className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800"
+      >
+        <label className="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100">
+          Game Mode:
+        </label>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setGameMode("free");
+              setSelectedRegionId(initialConfig?.id || "kanto");
+            }}
+            className={`flex-1 rounded-lg border-2 px-4 py-2 font-semibold transition-all ${
+              gameMode === "free"
+                ? "border-blue-500 bg-blue-500 text-white shadow-md"
+                : "border-gray-300 bg-gray-50 text-gray-700 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+            }`}
+          >
+            Free Play
+          </button>
+          <button
+            onClick={() => {
+              setGameMode("career");
+              startCareer();
+            }}
+            className={`flex-1 rounded-lg border-2 px-4 py-2 font-semibold transition-all ${
+              gameMode === "career"
+                ? "border-green-500 bg-green-500 text-white shadow-md"
+                : "border-gray-300 bg-gray-50 text-gray-700 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+            }`}
+          >
+            Career Mode
+          </button>
+          <button
+            onClick={() => {
+              if (careerProgress.masterModeUnlocked) {
+                setGameMode("master");
+                startMasterMode();
+              }
+            }}
+            disabled={!careerProgress.masterModeUnlocked}
+            className={`flex-1 rounded-lg border-2 px-4 py-2 font-semibold transition-all ${
+              gameMode === "master"
+                ? "border-purple-500 bg-purple-500 text-white shadow-md"
+                : !careerProgress.masterModeUnlocked
+                ? "cursor-not-allowed border-gray-300 bg-gray-100 text-gray-400 opacity-50 dark:border-gray-700 dark:bg-gray-800"
+                : "border-gray-300 bg-gray-50 text-gray-700 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+            }`}
+            title={
+              !careerProgress.masterModeUnlocked
+                ? "Complete all 6 regions to unlock Master Mode"
+                : "Challenge all regions in sequence"
+            }
+          >
+            Master Mode {!careerProgress.masterModeUnlocked && "🔒"}
+          </button>
+        </div>
+      </motion.div>
+
       {/* Region Selector */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -159,18 +266,49 @@ export function EliteFourLobby({
         <label className="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100">
           Select Region:
         </label>
-        <select
-          value={selectedRegionId}
-          onChange={(e) => setSelectedRegionId(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 bg-white p-2 text-gray-900 transition-colors hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:border-blue-500"
-        >
-          {availableRegions.map((region) => (
-            <option key={region.id} value={region.id}>
-              {region.name}
-            </option>
-          ))}
-        </select>
+        {gameMode === "master" ? (
+          <div className="rounded-lg border border-purple-300 bg-purple-50 p-3 text-center text-sm text-purple-800 dark:border-purple-600 dark:bg-purple-900/30 dark:text-purple-300">
+            Master Mode: Region {careerProgress.masterModeCurrentRegionIndex + 1} of {getAllEliteFourConfigs().length}
+            {getMasterModeCurrentRegion() && ` - ${getMasterModeCurrentRegion()?.name}`}
+          </div>
+        ) : (
+          <select
+            value={selectedRegionId}
+            onChange={(e) => setSelectedRegionId(e.target.value)}
+            disabled={gameMode === "career"}
+            className="w-full rounded-lg border border-gray-300 bg-white p-2 text-gray-900 transition-colors hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:border-blue-500"
+          >
+            {selectableRegions.map((region) => {
+              const isUnlocked = isRegionUnlocked(region.id);
+              const isCompleted = careerProgress.completedRegions.includes(region.id);
+              return (
+                <option key={region.id} value={region.id} disabled={!isUnlocked}>
+                  {region.name}
+                  {!isUnlocked && " 🔒"}
+                  {isCompleted && " ✓"}
+                  {gameMode === "career" && careerProgress.currentRegion === region.id && " (Current)"}
+                </option>
+              );
+            })}
+          </select>
+        )}
+        {gameMode === "career" && careerProgress.currentRegion && (
+          <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+            Career Mode: Currently at {availableRegions.find((r) => r.id === careerProgress.currentRegion)?.name || "Unknown"}
+          </p>
+        )}
       </motion.div>
+
+      {/* Career Progress (shown in Career Mode or if any progress exists) */}
+      {(gameMode === "career" || careerProgress.completedRegions.length > 0) && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.07 }}
+        >
+          <EliteFourCareerProgress />
+        </motion.div>
+      )}
 
       {/* Elite Four Members Preview */}
       <motion.div
