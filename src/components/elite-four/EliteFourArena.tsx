@@ -304,12 +304,16 @@ export function EliteFourArena() {
           </div>
         )}
 
-        {/* Effectiveness Indicator */}
+        {/* Effectiveness Indicator - At top on desktop */}
         {effectiveness !== null && effectiveness !== 1 && (
-          <EffectivenessIndicator
-            effectiveness={effectiveness}
-            speedMultiplier={animationSpeed}
-          />
+          <div className="pointer-events-none relative hidden lg:block" style={{ height: '60px' }}>
+            <div className="absolute left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2">
+              <EffectivenessIndicator
+                effectiveness={effectiveness}
+                speedMultiplier={animationSpeed}
+              />
+            </div>
+          </div>
         )}
 
         {/* Battle View */}
@@ -410,7 +414,16 @@ export function EliteFourArena() {
             </div>
 
             {/* Right Pokemon (Opponent) - Next to left on mobile, right column on desktop */}
-            <div className="col-span-1 lg:col-span-1 order-2 lg:order-3">
+            <div className="relative col-span-1 lg:col-span-1 order-2 lg:order-3">
+              {/* Effectiveness Indicator - Above opponent on mobile */}
+              {effectiveness !== null && effectiveness !== 1 && (
+                <div className="pointer-events-none absolute -top-12 left-1/2 z-50 -translate-x-1/2 lg:hidden">
+                  <EffectivenessIndicator
+                    effectiveness={effectiveness}
+                    speedMultiplier={animationSpeed}
+                  />
+                </div>
+              )}
               {pokemon2 && (
                 <PokemonPanel
                   activePokemon={pokemon2}

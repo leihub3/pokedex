@@ -29,7 +29,7 @@ export function EffectivenessIndicator({
   return (
     <AnimatePresence>
       <motion.div
-        className="pointer-events-none absolute left-1/2 top-1/4 z-50 -translate-x-1/2"
+        className="pointer-events-none"
         initial={{
           opacity: 0,
           y: 20,
