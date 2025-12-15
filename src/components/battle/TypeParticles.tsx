@@ -46,8 +46,11 @@ export function TypeParticles({
   useEffect(() => {
     // Calculate start and end positions based on panel positions
     const centerY = containerHeight / 2;
-    const leftX = containerWidth * 0.15; // Left panel center
-    const rightX = containerWidth * 0.85; // Right panel center
+    // Adjust positioning percentages based on container width (mobile vs desktop)
+    // On mobile (narrow containers), Pokemon are closer together, so use different percentages
+    const isMobile = containerWidth < 768; // Tailwind's md breakpoint
+    const leftX = isMobile ? containerWidth * 0.25 : containerWidth * 0.15; // Left panel center
+    const rightX = isMobile ? containerWidth * 0.75 : containerWidth * 0.85; // Right panel center
 
     const startX = fromPosition === "left" ? leftX : rightX;
     const startY = centerY;
@@ -104,7 +107,7 @@ export function TypeParticles({
   }
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div className="pointer-events-none absolute inset-0 z-50 overflow-hidden">
       <AnimatePresence>
         {particles.map((particle) => {
           const distance = Math.sqrt(

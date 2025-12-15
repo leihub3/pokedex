@@ -41,6 +41,24 @@ export function BattleArena() {
     useState<APIPokemon | null>(null);
   const [animationSpeed, setAnimationSpeed] = useState<AnimationSpeed>(1);
   
+  // Battle view container dimensions for particle positioning
+  const battleViewRef = useRef<HTMLDivElement>(null);
+  const [battleViewDimensions, setBattleViewDimensions] = useState({ width: 1200, height: 400 });
+
+  // Measure actual battle view container dimensions
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (battleViewRef.current) {
+        const rect = battleViewRef.current.getBoundingClientRect();
+        setBattleViewDimensions({ width: rect.width, height: rect.height });
+      }
+    };
+
+    updateDimensions();
+    window.addEventListener("resize", updateDimensions);
+    return () => window.removeEventListener("resize", updateDimensions);
+  }, []);
+  
   // Animation states
   const [pokemon1Attacking, setPokemon1Attacking] = useState(false);
   const [pokemon2Attacking, setPokemon2Attacking] = useState(false);
@@ -230,15 +248,15 @@ export function BattleArena() {
       )}
 
       {/* Battle View */}
-      <div className="grid gap-6 lg:grid-cols-3 relative">
+      <div className="grid gap-6 lg:grid-cols-3 relative" ref={battleViewRef}>
         {/* Type Particles - rendered here for proper positioning */}
         {pokemon1Attacking && pokemon1AttackType && (
           <TypeParticles
             type={pokemon1AttackType}
             fromPosition="left"
             toPosition="right"
-            containerWidth={typeof window !== "undefined" ? window.innerWidth * 0.9 : 1200}
-            containerHeight={400}
+            containerWidth={battleViewDimensions.width}
+            containerHeight={battleViewDimensions.height}
             speedMultiplier={animationSpeed}
           />
         )}
@@ -247,8 +265,8 @@ export function BattleArena() {
             type={pokemon2AttackType}
             fromPosition="right"
             toPosition="left"
-            containerWidth={typeof window !== "undefined" ? window.innerWidth * 0.9 : 1200}
-            containerHeight={400}
+            containerWidth={battleViewDimensions.width}
+            containerHeight={battleViewDimensions.height}
             speedMultiplier={animationSpeed}
           />
         )}
