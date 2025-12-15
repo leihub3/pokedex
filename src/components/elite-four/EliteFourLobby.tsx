@@ -151,13 +151,20 @@ export function EliteFourLobby({
         <h2 className="mb-6 text-center text-2xl font-bold text-gray-900 dark:text-gray-100">
           Your Challengers
         </h2>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+        {/* Horizontal Carousel for Mobile, Grid for Desktop */}
+        <div 
+          className="flex gap-4 overflow-x-auto pb-4 md:grid md:grid-cols-5 md:overflow-x-visible md:pb-0"
+          style={{ 
+            scrollbarWidth: 'thin', 
+            scrollbarColor: 'rgb(209 213 219) transparent' 
+          }}
+        >
           {config.members.map((member, index) => {
             const pokemon = opponentPokemon.find((p) => p.id === member.pokemonId);
             return (
               <div
                 key={member.id}
-                className="flex flex-col items-center rounded-lg bg-white p-4 shadow-md dark:bg-gray-800"
+                className="flex min-w-[140px] flex-shrink-0 flex-col items-center rounded-lg bg-white p-4 shadow-md dark:bg-gray-800 md:min-w-0"
               >
                 <div className="relative mb-2 h-20 w-20">
                   {pokemon ? (
@@ -189,7 +196,7 @@ export function EliteFourLobby({
             );
           })}
           {/* Champion */}
-          <div className="flex flex-col items-center rounded-lg bg-gradient-to-br from-yellow-400 to-orange-400 p-4 shadow-md">
+          <div className="flex min-w-[140px] flex-shrink-0 flex-col items-center rounded-lg bg-gradient-to-br from-yellow-400 to-orange-400 p-4 shadow-md md:min-w-0">
             {opponentPokemon.find((p) => p.id === config.champion.pokemonId) && (
               <>
                 <div className="relative mb-2 h-20 w-20">

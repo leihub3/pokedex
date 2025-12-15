@@ -120,105 +120,115 @@ export function MoveSelectionScreen({
         </p>
       </div>
 
-      {/* Moves Grid */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <AnimatePresence>
-          {availableMoves.map((move) => {
-            const isSelected = selectedMoveIds.has(move.id);
-            const isFull = selectedMoveIds.size >= MAX_SELECTED && !isSelected;
+      {/* Moves Carousel/Gallery */}
+      <div className="w-full">
+        {/* Scrollable container */}
+        <div 
+          className="flex gap-4 overflow-x-auto pb-4"
+          style={{ 
+            scrollbarWidth: 'thin', 
+            scrollbarColor: 'rgb(209 213 219) transparent' 
+          }}
+        >
+          <AnimatePresence>
+            {availableMoves.map((move) => {
+              const isSelected = selectedMoveIds.has(move.id);
+              const isFull = selectedMoveIds.size >= MAX_SELECTED && !isSelected;
 
-            return (
-              <motion.div
-                key={move.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                whileHover={!isFull ? { scale: 1.02 } : {}}
-                whileTap={!isFull ? { scale: 0.98 } : {}}
-                onClick={() => !isFull && toggleMove(move.id)}
-                className={cn(
-                  "cursor-pointer rounded-lg border-2 p-4 transition-all",
-                  isSelected
-                    ? "border-blue-500 bg-blue-50 shadow-md dark:border-blue-400 dark:bg-blue-900/20"
-                    : isFull
-                    ? "cursor-not-allowed border-gray-200 bg-gray-50 opacity-60 dark:border-gray-700 dark:bg-gray-800"
-                    : "border-gray-300 bg-white hover:border-blue-400 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:hover:border-blue-500"
-                )}
-              >
-                {/* Header: Name and Type */}
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="font-bold capitalize text-gray-900 dark:text-gray-100">
-                    {move.name}
-                  </h3>
-                  <Badge variant="type" typeName={move.type.name}>
-                    {move.type.name}
-                  </Badge>
-                </div>
+              return (
+                <motion.div
+                  key={move.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  whileHover={!isFull ? { scale: 1.02, y: -4 } : {}}
+                  whileTap={!isFull ? { scale: 0.98 } : {}}
+                  onClick={() => !isFull && toggleMove(move.id)}
+                  className={cn(
+                    "flex-shrink-0 cursor-pointer rounded-lg border-2 p-4 transition-all",
+                    "w-[280px] min-w-[280px]", // Fixed width for consistent card size
+                    isSelected
+                      ? "border-blue-500 bg-blue-50 shadow-md dark:border-blue-400 dark:bg-blue-900/20"
+                      : isFull
+                      ? "cursor-not-allowed border-gray-200 bg-gray-50 opacity-60 dark:border-gray-700 dark:bg-gray-800"
+                      : "border-gray-300 bg-white hover:border-blue-400 hover:shadow-md dark:border-gray-600 dark:bg-gray-800 dark:hover:border-blue-500"
+                  )}
+                >
+                  {/* Header: Name and Type */}
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <h3 className="font-bold capitalize text-gray-900 dark:text-gray-100">
+                      {move.name}
+                    </h3>
+                    <Badge variant="type" typeName={move.type.name}>
+                      {move.type.name}
+                    </Badge>
+                  </div>
 
-                {/* Stats Row */}
-                <div className="mb-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
-                  {move.power !== null && (
-                    <span>
-                      <span className="font-semibold">Power:</span> {move.power}
-                    </span>
-                  )}
-                  {move.accuracy !== null && (
-                    <span>
-                      <span className="font-semibold">Acc:</span> {move.accuracy}%
-                    </span>
-                  )}
-                  {move.pp !== null && (
-                    <span>
-                      <span className="font-semibold">PP:</span> {move.pp}
-                    </span>
-                  )}
-                  {move.priority !== 0 && (
-                    <span className="text-blue-600 dark:text-blue-400">
-                      <span className="font-semibold">Priority:</span>{" "}
-                      {move.priority > 0 ? "+" : ""}
-                      {move.priority}
-                    </span>
-                  )}
-                </div>
-
-                {/* Damage Class Badge */}
-                <div className="mb-2">
-                  <span
-                    className={cn(
-                      "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                      getDamageClassBadgeColor(move.damage_class.name)
+                  {/* Stats Row */}
+                  <div className="mb-2 flex flex-wrap gap-2 text-xs text-gray-600 dark:text-gray-400">
+                    {move.power !== null && (
+                      <span>
+                        <span className="font-semibold">Power:</span> {move.power}
+                      </span>
                     )}
-                  >
-                    {move.damage_class.name.charAt(0).toUpperCase() +
-                      move.damage_class.name.slice(1)}
-                  </span>
-                </div>
+                    {move.accuracy !== null && (
+                      <span>
+                        <span className="font-semibold">Acc:</span> {move.accuracy}%
+                      </span>
+                    )}
+                    {move.pp !== null && (
+                      <span>
+                        <span className="font-semibold">PP:</span> {move.pp}
+                      </span>
+                    )}
+                    {move.priority !== 0 && (
+                      <span className="text-blue-600 dark:text-blue-400">
+                        <span className="font-semibold">Priority:</span>{" "}
+                        {move.priority > 0 ? "+" : ""}
+                        {move.priority}
+                      </span>
+                    )}
+                  </div>
 
-                {/* Effect Description */}
-                <p className="mb-2 text-xs text-gray-600 dark:text-gray-400">
-                  {getEffectDescription(move)}
-                </p>
+                  {/* Damage Class Badge */}
+                  <div className="mb-2">
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                        getDamageClassBadgeColor(move.damage_class.name)
+                      )}
+                    >
+                      {move.damage_class.name.charAt(0).toUpperCase() +
+                        move.damage_class.name.slice(1)}
+                    </span>
+                  </div>
 
-                {/* Selection Indicator */}
-                <div className="mt-2 flex items-center justify-end">
-                  {isSelected ? (
-                    <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                      ✓ Selected
-                    </span>
-                  ) : (
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      Click to select
-                    </span>
-                  )}
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+                  {/* Effect Description */}
+                  <p className="mb-2 text-xs text-gray-600 dark:text-gray-400 line-clamp-3">
+                    {getEffectDescription(move)}
+                  </p>
+
+                  {/* Selection Indicator */}
+                  <div className="mt-2 flex items-center justify-end">
+                    {isSelected ? (
+                      <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                        ✓ Selected
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        Click to select
+                      </span>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex justify-center gap-4">
+      <div className="flex justify-center gap-4 pt-4">
         {onCancel && (
           <button
             onClick={onCancel}
