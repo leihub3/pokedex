@@ -16,7 +16,7 @@ import Image from "next/image";
 
 interface EliteFourLobbyProps {
   config?: EliteFourConfig;
-  onStart: (userPokemon: Pokemon, selectedMoves: EngineMove[]) => void;
+  onStart: (userPokemon: Pokemon, selectedMoves: EngineMove[], selectedConfig: EliteFourConfig) => void;
   isStarting: boolean;
 }
 

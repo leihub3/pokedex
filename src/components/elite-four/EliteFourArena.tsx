@@ -212,7 +212,11 @@ export function EliteFourArena() {
   if (status === "lobby") {
     const availableRegions = getAllEliteFourConfigs();
     const defaultConfig = config || availableRegions[0];
-    const handleStart = (userPokemon: APIPokemon, selectedMoves: import("@/battle-engine").Move[], selectedConfig: import("@/data/eliteFour").EliteFourConfig) => {
+    const handleStart = (
+      userPokemon: APIPokemon, 
+      selectedMoves: import("@/battle-engine").Move[], 
+      selectedConfig: import("@/data/eliteFour").EliteFourConfig
+    ) => {
       // Use the config selected in the lobby
       startRun(userPokemon, selectedConfig, selectedMoves);
     };
