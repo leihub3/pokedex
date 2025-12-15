@@ -13,7 +13,7 @@ import { BattleControls } from "@/components/battle/BattleControls";
 import { EffectivenessIndicator } from "@/components/battle/EffectivenessIndicator";
 import { TypeParticles } from "@/components/battle/TypeParticles";
 import { calculateMoveEffectiveness, type Effectiveness } from "@/lib/utils/battleHelpers";
-import { KANTO_ELITE_FOUR } from "@/data/eliteFour";
+import { getAllEliteFourConfigs } from "@/data/eliteFour";
 import type { Pokemon as APIPokemon } from "@/types/api";
 import type { AnimationSpeed } from "@/hooks/useBattleAnimation";
 
@@ -210,14 +210,16 @@ export function EliteFourArena() {
 
   // Render based on status
   if (status === "lobby") {
-    const currentConfig = config || KANTO_ELITE_FOUR;
-    const handleStart = (userPokemon: APIPokemon, selectedMoves: import("@/battle-engine").Move[]) => {
-      startRun(userPokemon, currentConfig, selectedMoves);
+    const availableRegions = getAllEliteFourConfigs();
+    const defaultConfig = config || availableRegions[0];
+    const handleStart = (userPokemon: APIPokemon, selectedMoves: import("@/battle-engine").Move[], selectedConfig: import("@/data/eliteFour").EliteFourConfig) => {
+      // Use the config selected in the lobby
+      startRun(userPokemon, selectedConfig, selectedMoves);
     };
     
     return (
       <EliteFourLobby
-        config={currentConfig}
+        config={defaultConfig}
         onStart={handleStart}
         isStarting={isLoading}
       />

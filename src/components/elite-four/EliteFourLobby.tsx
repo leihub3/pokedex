@@ -10,20 +10,27 @@ import { MoveSelectionScreen } from "@/components/battle/MoveSelectionScreen";
 import { getAvailablePokemonMoves } from "@/lib/pokemon-api/normalizeForBattle";
 import type { Pokemon, PokemonListItem, Move as APIMove } from "@/types/api";
 import type { EliteFourConfig } from "@/data/eliteFour";
+import { getAllEliteFourConfigs } from "@/data/eliteFour";
 import type { Move as EngineMove } from "@/battle-engine";
 import Image from "next/image";
 
 interface EliteFourLobbyProps {
-  config: EliteFourConfig;
+  config?: EliteFourConfig;
   onStart: (userPokemon: Pokemon, selectedMoves: EngineMove[]) => void;
   isStarting: boolean;
 }
 
 export function EliteFourLobby({
-  config,
+  config: initialConfig,
   onStart,
   isStarting,
 }: EliteFourLobbyProps) {
+  const availableRegions = getAllEliteFourConfigs();
+  const [selectedRegionId, setSelectedRegionId] = useState<string>(
+    initialConfig?.id || "kanto"
+  );
+  const currentConfig = availableRegions.find((r) => r.id === selectedRegionId) || availableRegions[0];
+
   const [userPokemon, setUserPokemon] = useState<Pokemon | null>(null);
   const [search, setSearch] = useState("");
   const [isLoadingPokemon, setIsLoadingPokemon] = useState(false);
@@ -56,8 +63,8 @@ export function EliteFourLobby({
     const loadOpponentPokemon = async () => {
       try {
         const pokemonIds = [
-          ...config.members.map((m) => m.pokemonId),
-          config.champion.pokemonId,
+          ...currentConfig.members.map((m) => m.pokemonId),
+          currentConfig.champion.pokemonId,
         ];
         const pokemonPromises = pokemonIds.map((id) => getPokemonById(id));
         const pokemon = await Promise.all(pokemonPromises);
@@ -67,7 +74,7 @@ export function EliteFourLobby({
       }
     };
     loadOpponentPokemon();
-  }, [config]);
+  }, [currentConfig]);
 
   const handleSearch = async (searchTerm?: string) => {
     const term = searchTerm || search;
@@ -112,7 +119,8 @@ export function EliteFourLobby({
 
   const handleMoveConfirm = (selectedMoves: EngineMove[]) => {
     if (userPokemon && selectedMoves.length === 4) {
-      onStart(userPokemon, selectedMoves);
+      // Pass the current selected config to onStart
+      onStart(userPokemon, selectedMoves, currentConfig);
     }
   };
 
@@ -134,11 +142,34 @@ export function EliteFourLobby({
         className="text-center"
       >
         <h1 className="mb-4 text-4xl font-bold text-gray-900 dark:text-gray-100">
-          {config.name}
+          {currentConfig.name}
         </h1>
         <p className="text-lg text-gray-600 dark:text-gray-400">
           Face the Elite Four and become the Champion!
         </p>
+      </motion.div>
+
+      {/* Region Selector */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="rounded-lg border border-gray-200 bg-white p-4 shadow-md dark:border-gray-700 dark:bg-gray-800"
+      >
+        <label className="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100">
+          Select Region:
+        </label>
+        <select
+          value={selectedRegionId}
+          onChange={(e) => setSelectedRegionId(e.target.value)}
+          className="w-full rounded-lg border border-gray-300 bg-white p-2 text-gray-900 transition-colors hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:border-blue-500"
+        >
+          {availableRegions.map((region) => (
+            <option key={region.id} value={region.id}>
+              {region.name}
+            </option>
+          ))}
+        </select>
       </motion.div>
 
       {/* Elite Four Members Preview */}
@@ -159,7 +190,7 @@ export function EliteFourLobby({
             scrollbarColor: 'rgb(209 213 219) transparent' 
           }}
         >
-          {config.members.map((member, index) => {
+          {currentConfig.members.map((member, index) => {
             const pokemon = opponentPokemon.find((p) => p.id === member.pokemonId);
             return (
               <div
@@ -197,26 +228,26 @@ export function EliteFourLobby({
           })}
           {/* Champion */}
           <div className="flex min-w-[140px] flex-shrink-0 flex-col items-center rounded-lg bg-gradient-to-br from-yellow-400 to-orange-400 p-4 shadow-md md:min-w-0">
-            {opponentPokemon.find((p) => p.id === config.champion.pokemonId) && (
+            {opponentPokemon.find((p) => p.id === currentConfig.champion.pokemonId) && (
               <>
                 <div className="relative mb-2 h-20 w-20">
                   <Image
                     src={
                       opponentPokemon
-                        .find((p) => p.id === config.champion.pokemonId)
+                        .find((p) => p.id === currentConfig.champion.pokemonId)
                         ?.sprites.other["official-artwork"]?.front_default ||
-                      opponentPokemon.find((p) => p.id === config.champion.pokemonId)
+                      opponentPokemon.find((p) => p.id === currentConfig.champion.pokemonId)
                         ?.sprites.front_default ||
                       ""
                     }
-                    alt={config.champion.name}
+                    alt={currentConfig.champion.name}
                     fill
                     className="object-contain"
                     sizes="80px"
                   />
                 </div>
                 <p className="mb-1 text-sm font-bold text-white">
-                  {config.champion.name}
+                  {currentConfig.champion.name}
                 </p>
                 <p className="text-xs font-semibold text-white">Champion</p>
               </>
