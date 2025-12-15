@@ -11,6 +11,8 @@ interface EliteFourProgressProps {
   defeatedOpponents: string[];
   userPokemon: Pokemon | null;
   opponentPokemon: Pokemon[];
+  currentRound?: number;
+  roundWins?: { user: number; opponent: number };
 }
 
 export function EliteFourProgress({
@@ -19,6 +21,8 @@ export function EliteFourProgress({
   defeatedOpponents,
   userPokemon,
   opponentPokemon,
+  currentRound = 1,
+  roundWins = { user: 0, opponent: 0 },
 }: EliteFourProgressProps) {
   const isDefeated = (opponentId: string) => defeatedOpponents.includes(opponentId);
   const isCurrent = (index: number) => currentOpponentIndex === index;
@@ -26,6 +30,19 @@ export function EliteFourProgress({
   const getOpponentPokemon = (pokemonId: number) => {
     return opponentPokemon.find((p) => p.id === pokemonId);
   };
+
+  const getCurrentOpponent = () => {
+    if (currentOpponentIndex === null) return null;
+    if (currentOpponentIndex < config.members.length) {
+      return config.members[currentOpponentIndex];
+    } else if (currentOpponentIndex === config.members.length) {
+      return config.champion;
+    }
+    return null;
+  };
+
+  const currentOpponent = getCurrentOpponent();
+  const isFinalRound = currentRound === 3 && roundWins.user === 1 && roundWins.opponent === 1;
 
   return (
     <div className="mb-6 rounded-lg border-2 border-purple-500 bg-gradient-to-br from-purple-50 to-indigo-50 p-4 shadow-lg dark:from-purple-900/20 dark:to-indigo-900/20">
@@ -54,6 +71,35 @@ export function EliteFourProgress({
           </div>
         )}
       </div>
+
+      {/* Round Information */}
+      {currentOpponent && currentOpponentIndex !== null && (
+        <div className="mb-4 rounded-lg border border-purple-300 bg-white p-3 dark:border-purple-600 dark:bg-gray-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div>
+                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                  {isFinalRound ? "Final Round" : `Round ${currentRound}/3`}
+                </span>
+                {isFinalRound && (
+                  <span className="ml-2 text-xs font-bold text-red-600 dark:text-red-400">
+                    (Deciding Round)
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-lg font-bold">
+                <span className="text-blue-600 dark:text-blue-400">
+                  You {roundWins.user}
+                </span>
+                <span className="text-gray-400">-</span>
+                <span className="text-red-600 dark:text-red-400">
+                  {roundWins.opponent} {currentOpponent.name}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="grid gap-3 md:grid-cols-5">
         {/* Elite Four Members */}

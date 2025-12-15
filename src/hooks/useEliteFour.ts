@@ -19,6 +19,8 @@ export interface UseEliteFourReturn {
   defeatedOpponents: string[]; // IDs of defeated opponents
   currentOpponent: EliteFourMember | EliteFourChampion | null;
   opponentPokemon: APIPokemon | null;
+  roundWins: { user: number; opponent: number }; // Round wins for current matchup
+  currentRound: number; // Current round number (1, 2, or 3)
   
   // Battle hook instance
   battle: UseBattleReturn;
@@ -47,6 +49,8 @@ export function useEliteFour(): UseEliteFourReturn {
   const [defeatedOpponents, setDefeatedOpponents] = useState<string[]>([]);
   const [opponentPokemon, setOpponentPokemon] = useState<APIPokemon | null>(null);
   const [userSelectedMoves, setUserSelectedMoves] = useState<EngineMove[] | null>(null);
+  const [roundWins, setRoundWins] = useState<{ user: number; opponent: number }>({ user: 0, opponent: 0 });
+  const [currentRound, setCurrentRound] = useState<number>(1);
   
   // Use battle hook for individual battles
   const battle = useBattle();
@@ -55,6 +59,10 @@ export function useEliteFour(): UseEliteFourReturn {
   const battleProcessedRef = useRef<string | null>(null);
   // Track the last processed opponent index to ensure we only process the current battle
   const lastProcessedOpponentIndexRef = useRef<number | null>(null);
+  // Track if we've already started a battle for this round/opponent combo
+  const battleStartedForRoundRef = useRef<string | null>(null);
+  // Track if we're currently in the process of starting a battle (to prevent cleanup from canceling)
+  const isStartingBattleRef = useRef<boolean>(false);
   
   /**
    * Get current opponent (member or champion)
@@ -70,6 +78,14 @@ export function useEliteFour(): UseEliteFourReturn {
     
     return null;
   }, [config, currentOpponentIndex]);
+
+  /**
+   * Reset round state for new opponent matchup
+   */
+  const resetRoundState = useCallback(() => {
+    setRoundWins({ user: 0, opponent: 0 });
+    setCurrentRound(1);
+  }, []);
   
   /**
    * Start Elite Four challenge
@@ -82,42 +98,75 @@ export function useEliteFour(): UseEliteFourReturn {
       setOpponentPokemon(null);
       setCurrentOpponentIndex(0);
       setUserSelectedMoves(selectedMoves || null);
+      resetRoundState(); // Reset round state for first opponent
       setStatus("battling");
       // Battle will start via useEffect when currentOpponentIndex changes
     },
-    []
+    [resetRoundState]
   );
   
   /**
    * Start battle with current opponent
    */
   const startNextBattle = useCallback(async () => {
-    if (!config || currentOpponentIndex === null || !userPokemon) return;
+    console.log("startNextBattle called", { config: !!config, currentOpponentIndex, userPokemon: !!userPokemon });
+    
+    if (!config || currentOpponentIndex === null || !userPokemon) {
+      console.log("startNextBattle: Early return - missing required data");
+      isStartingBattleRef.current = false;
+      return;
+    }
     
     const opponent = getCurrentOpponent();
-    if (!opponent) return;
+    if (!opponent) {
+      console.log("startNextBattle: Early return - no opponent");
+      isStartingBattleRef.current = false;
+      return;
+    }
+    
+    console.log(`startNextBattle: Starting battle for ${opponent.title}, round ${currentRound}`);
     
     try {
-      // Reset opponent Pokemon state first
-      setOpponentPokemon(null);
-      
-      // Reset battle processed tracker for new battle
-      // Don't reset lastProcessedOpponentIndexRef - it should remain at previous opponent
+      // Reset battle processed tracker for new battle/round
       battleProcessedRef.current = null;
       
-      // Fetch opponent's Pokemon
-      const opponentPoke = await getPokemonById(opponent.pokemonId);
-      setOpponentPokemon(opponentPoke);
+      // Only reset opponent Pokemon if it's a new opponent
+      // For round advances, keep the same opponent Pokemon
+      const currentOpponentPoke = opponentPokemon;
+      let opponentPoke = currentOpponentPoke;
+      
+      if (!opponentPoke || opponentPoke.id !== opponent.pokemonId) {
+        // New opponent - fetch Pokemon
+        console.log(`startNextBattle: Fetching opponent Pokemon ${opponent.pokemonId}`);
+        // Don't set to null here to avoid triggering useEffect re-run
+        // We'll set it directly to the fetched Pokemon
+        opponentPoke = await getPokemonById(opponent.pokemonId);
+        console.log(`startNextBattle: Fetched opponent Pokemon: ${opponentPoke.name}`);
+        setOpponentPokemon(opponentPoke);
+      } else {
+        console.log(`startNextBattle: Using existing opponent Pokemon: ${opponentPoke.name}`);
+      }
       
       // Reset battle hook for fresh battle (ensures HP resets)
+      console.log("startNextBattle: Resetting battle");
       battle.resetBattle();
       
       // Get opponent moves (always fetch, user might have selected moves)
+      console.log("startNextBattle: Fetching opponent moves");
       const opponentMoves = await getPokemonMoves(opponentPoke, 4);
+      console.log(`startNextBattle: Got ${opponentMoves.length} opponent moves`);
       
       // Start battle - user is always pokemon1 (index 0)
       // Use selected moves for user if available, otherwise battle will fetch automatically
-      const seed = Date.now() + currentOpponentIndex;
+      // Include round number in seed for variety between rounds
+      const seed = Date.now() + currentOpponentIndex * 100 + currentRound;
+      console.log("startNextBattle: Calling battle.startBattle", {
+        userPokemon: userPokemon.name,
+        opponentPokemon: opponentPoke.name,
+        seed,
+        userMoves: userSelectedMoves?.length || 0,
+        opponentMoves: opponentMoves.length
+      });
       await battle.startBattle(
         userPokemon, 
         opponentPoke, 
@@ -125,15 +174,27 @@ export function useEliteFour(): UseEliteFourReturn {
         userSelectedMoves || undefined,
         opponentMoves.length > 0 ? opponentMoves : undefined
       );
+      console.log("startNextBattle: battle.startBattle completed");
       
-      console.log("✓ Started battle for opponent index:", currentOpponentIndex, opponent.title);
+      // Mark that we've successfully started a battle for this round
+      const roundKey = `${currentOpponentIndex}-${currentRound}`;
+      battleStartedForRoundRef.current = roundKey;
+      isStartingBattleRef.current = false;
+      
+      console.log(`✓ Started round ${currentRound} for opponent index: ${currentOpponentIndex}, ${opponent.title}`);
     } catch (error) {
       console.error("Failed to start Elite Four battle:", error);
+      console.error("Error details:", error instanceof Error ? error.stack : error);
+      // Reset the ref on error so we can retry
+      battleStartedForRoundRef.current = null;
+      isStartingBattleRef.current = false;
+      // Re-throw to allow error handling upstream if needed
+      throw error;
     }
-  }, [config, currentOpponentIndex, userPokemon, userSelectedMoves, battle, getCurrentOpponent]);
+  }, [config, currentOpponentIndex, currentRound, userPokemon, userSelectedMoves, opponentPokemon, battle, getCurrentOpponent]);
   
   /**
-   * Handle battle win - advance to next opponent or complete challenge
+   * Handle battle win - check if won matchup (2 rounds) or continue to next round
    */
   const onBattleWin = useCallback(() => {
     if (!config || currentOpponentIndex === null) {
@@ -147,86 +208,105 @@ export function useEliteFour(): UseEliteFourReturn {
       return;
     }
     
-    // Debug logging
-    console.log("onBattleWin:", {
-      currentOpponentIndex,
-      membersLength: config.members.length,
-      opponentId: opponent.id,
-      opponentTitle: opponent.title,
-      isChampion: currentOpponentIndex === config.members.length
-    });
-    
-    // Add opponent to defeated list
-    setDefeatedOpponents((prev) => {
-      // Prevent duplicate additions
-      if (prev.includes(opponent.id)) {
-        return prev;
+    // Increment user's round wins
+    setRoundWins((prev) => {
+      const newWins = { ...prev, user: prev.user + 1 };
+      console.log(`Round ${currentRound} won by user. Score: ${newWins.user} - ${prev.opponent}`);
+      
+      // Check if user won the matchup (2 wins)
+      if (newWins.user === 2) {
+        // Win the matchup
+        const membersCount = config.members.length;
+        const isChampion = currentOpponentIndex === membersCount;
+        
+        // Add opponent to defeated list
+        setDefeatedOpponents((prevDefeated) => {
+          if (prevDefeated.includes(opponent.id)) {
+            return prevDefeated;
+          }
+          return [...prevDefeated, opponent.id];
+        });
+        
+        if (isChampion) {
+          // Defeated Champion - Victory!
+          console.log("✓ Champion defeated! Showing victory screen.");
+          setStatus("victory");
+        } else {
+          // Not the champion yet - continue to next opponent
+          console.log(`→ Matchup won! Moving to next opponent. Current index: ${currentOpponentIndex}, Next index: ${currentOpponentIndex + 1}`);
+          
+          // Reset round state for new opponent
+          resetRoundState();
+          
+          // Reset opponent Pokemon to trigger useEffect for next battle
+          setOpponentPokemon(null);
+          
+          // Advance to next opponent (useEffect will start next battle)
+          const nextIndex = currentOpponentIndex + 1;
+          
+          setCurrentOpponentIndex((prevIndex) => {
+            if (prevIndex !== currentOpponentIndex) {
+              console.warn(`currentOpponentIndex mismatch: prev=${prevIndex}, current=${currentOpponentIndex}`);
+            }
+            return nextIndex;
+          });
+          
+          setStatus((prevStatus) => {
+            if (prevStatus !== "battling") {
+              console.warn(`Status was ${prevStatus}, forcing to 'battling'`);
+            }
+            return "battling";
+          });
+        }
+      } else {
+        // Continue to next round (user won but doesn't have 2 wins yet)
+        const nextRound = currentRound + 1;
+        console.log(`→ Round ${currentRound} won. Continuing to round ${nextRound}`);
+        // DON'T clear battleProcessedRef here - we need to keep it to prevent reprocessing the same battle
+        // The battleKey includes the round number, so different rounds will have different keys
+        // DON'T clear battleStartedForRoundRef here - we need it to extract the round number
+        // The next battle start will overwrite it with the new round key
+        // Increment round - this will trigger useEffect to start next battle
+        setCurrentRound(nextRound);
+        // Battle will reset and start next round via startNextBattle
       }
-      return [...prev, opponent.id];
+      
+      return newWins;
     });
-    
-    // Check if this was the champion
-    // Champion is at index = members.length (which is 4 for 4 members)
-    // Members are at indices 0, 1, 2, 3 (Lorelei, Bruno, Agatha, Lance)
-    // Champion is at index 4 (Blue)
-    // So we need: currentOpponentIndex === 4 to show victory
-    const membersCount = config.members.length; // Should be 4
-    const isChampion = currentOpponentIndex === membersCount;
-    
-    console.log("Victory check:", {
-      currentOpponentIndex,
-      membersCount,
-      isChampion,
-      condition: `${currentOpponentIndex} === ${membersCount}`
-    });
-    
-    if (isChampion) {
-      // Defeated Champion - Victory!
-      console.log("✓ Champion defeated! Showing victory screen.");
-      setStatus("victory");
-    } else if (currentOpponentIndex < membersCount) {
-      // Not the champion yet - continue to next opponent
-      // This is an Elite Four member (index 0, 1, 2, or 3)
-      console.log(`→ Moving to next opponent. Current index: ${currentOpponentIndex}, Next index: ${currentOpponentIndex + 1}`);
-      
-      // Reset opponent Pokemon to trigger useEffect for next battle
-      setOpponentPokemon(null);
-      
-      // Advance to next opponent (useEffect will start next battle)
-      const nextIndex = currentOpponentIndex + 1;
-      
-      // Use functional updates to avoid stale state
-      setCurrentOpponentIndex((prevIndex) => {
-        if (prevIndex !== currentOpponentIndex) {
-          console.warn(`currentOpponentIndex mismatch: prev=${prevIndex}, current=${currentOpponentIndex}`);
-        }
-        return nextIndex;
-      });
-      
-      // Explicitly ensure status remains "battling" 
-      setStatus((prevStatus) => {
-        if (prevStatus !== "battling") {
-          console.warn(`Status was ${prevStatus}, forcing to 'battling'`);
-        }
-        return "battling";
-      });
-    } else {
-      // Invalid state - opponent index is out of bounds
-      console.error("Invalid opponent index:", {
-        currentOpponentIndex,
-        membersCount,
-        message: "Opponent index is greater than members.length + 1"
-      });
-      setStatus("defeated"); // Fallback to defeated state
-    }
-  }, [config, currentOpponentIndex, getCurrentOpponent]);
+  }, [config, currentOpponentIndex, currentRound, getCurrentOpponent, resetRoundState]);
   
   /**
-   * Handle battle loss - end the run
+   * Handle battle loss - check if lost matchup (2 losses) or continue to next round
    */
   const onBattleLoss = useCallback(() => {
-    setStatus("defeated");
-  }, []);
+    // Increment opponent's round wins
+    setRoundWins((prev) => {
+      // Use functional update to ensure we're working with latest state
+      const currentWins = prev;
+      const newWins = { ...currentWins, opponent: currentWins.opponent + 1 };
+      console.log(`Round ${currentRound} won by opponent. Score: ${currentWins.user} - ${newWins.opponent}`);
+      
+      // Check if opponent won the matchup (2 wins)
+      if (newWins.opponent === 2) {
+        // Lost the matchup - end the run
+        console.log("✗ Matchup lost! Ending challenge.");
+        setStatus("defeated");
+      } else {
+        // Continue to next round (opponent won but doesn't have 2 wins yet)
+        const nextRound = currentRound + 1;
+        console.log(`→ Round ${currentRound} lost. Continuing to round ${nextRound}`);
+        // DON'T clear battleProcessedRef here - we need to keep it to prevent reprocessing the same battle
+        // The battleKey includes the round number, so different rounds will have different keys
+        // DON'T clear battleStartedForRoundRef here - we need it to extract the round number
+        // The next battle start will overwrite it with the new round key
+        // Increment round - this will trigger useEffect to start next battle
+        setCurrentRound(nextRound);
+        // Battle will reset and start next round via startNextBattle
+      }
+      
+      return newWins;
+    });
+  }, [currentRound]);
   
   /**
    * Reset to lobby state
@@ -239,10 +319,12 @@ export function useEliteFour(): UseEliteFourReturn {
     setDefeatedOpponents([]);
     setOpponentPokemon(null);
     setUserSelectedMoves(null);
+    resetRoundState();
     battleProcessedRef.current = null; // Reset processed battles tracker
     lastProcessedOpponentIndexRef.current = null; // Reset last processed opponent index
+    battleStartedForRoundRef.current = null; // Reset battle started tracker
     battle.resetBattle();
-  }, [battle]);
+  }, [battle, resetRoundState]);
   
   /**
    * Check if current battle is against Champion
@@ -281,6 +363,11 @@ export function useEliteFour(): UseEliteFourReturn {
       return;
     }
     
+    // Don't process if we're currently starting a battle
+    if (isStartingBattleRef.current) {
+      return;
+    }
+    
     // Get current opponent to verify this battle is for the right opponent
     const currentOpponent = getCurrentOpponent();
     if (!currentOpponent || opponentPokemon.id !== currentOpponent.pokemonId) {
@@ -297,20 +384,58 @@ export function useEliteFour(): UseEliteFourReturn {
       return;
     }
     
-    // CRITICAL: Only process if this battle is for the CURRENT opponent index
-    // This prevents processing old battles when opponent index changes
-    if (lastProcessedOpponentIndexRef.current === currentOpponentIndex) {
-      console.log("Battle for opponent index already processed, skipping:", currentOpponentIndex);
-      return;
-    }
-    
     const winnerIndex = battle.getWinner();
     if (winnerIndex === null) {
       return;
     }
     
+    // Extract the round number from battleStartedForRoundRef FIRST, before any checks
+    // This is critical: we need to know which round this battle belongs to before we check if it matches
+    // If the ref is null, we can't determine the round, so skip processing
+    if (!battleStartedForRoundRef.current) {
+      console.log("Cannot process battle: battleStartedForRoundRef is null, skipping", {
+        currentRound,
+        currentOpponentIndex
+      });
+      return;
+    }
+    
+    // Extract the round number from the ref
+    const parts = battleStartedForRoundRef.current.split('-');
+    if (parts.length < 2) {
+      console.log("Cannot process battle: invalid battleStartedForRoundRef format", {
+        ref: battleStartedForRoundRef.current,
+        currentRound
+      });
+      return;
+    }
+    
+    const battleRound = parseInt(parts[1], 10);
+    if (isNaN(battleRound)) {
+      console.log("Cannot process battle: invalid round number in battleStartedForRoundRef", {
+        ref: battleStartedForRoundRef.current,
+        currentRound
+      });
+      return;
+    }
+    
     // Create a unique key for this battle to prevent duplicate processing
-    const battleKey = `${currentOpponentIndex}-${battle.battleState?.turnNumber || 0}-${battle.battleState?.log.length || 0}`;
+    // Use the extracted battleRound (round the battle was actually started for), not currentRound
+    // This prevents issues when currentRound changes between processing calls
+    const battleKey = `${currentOpponentIndex}-${battleRound}-${battle.battleState?.turnNumber || 0}-${battle.battleState?.log.length || 0}`;
+    
+    // Verify this battle matches what we expect - check using the extracted battleRound
+    const expectedRoundKey = `${currentOpponentIndex}-${battleRound}`;
+    if (battleStartedForRoundRef.current !== expectedRoundKey) {
+      // This battle doesn't match - it's from a different round
+      console.log("Battle doesn't match expected round, skipping", {
+        battleRoundKey: battleStartedForRoundRef.current,
+        expectedRoundKey,
+        battleRound,
+        currentRound
+      });
+      return;
+    }
     if (battleProcessedRef.current === battleKey) {
       // Already processed this exact battle result
       console.log("Battle already processed, skipping:", battleKey);
@@ -326,7 +451,7 @@ export function useEliteFour(): UseEliteFourReturn {
       status
     });
     
-    // Mark this battle as processed for THIS opponent index
+    // Mark this battle as processed
     battleProcessedRef.current = battleKey;
     lastProcessedOpponentIndexRef.current = currentOpponentIndex;
     
@@ -341,8 +466,21 @@ export function useEliteFour(): UseEliteFourReturn {
       onBattleLoss();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, battle.battleState, battle.isBattleFinished, battle.getWinner, onBattleWin, onBattleLoss, currentOpponentIndex, opponentPokemon?.id]);
+  }, [status, battle.battleState, battle.isBattleFinished, battle.getWinner, onBattleWin, onBattleLoss, currentOpponentIndex, currentRound, opponentPokemon?.id]);
   
+  // Reset round state when opponent index changes (new opponent matchup)
+  useEffect(() => {
+    if (status === "battling" && currentOpponentIndex !== null) {
+      // Reset round state when starting a new opponent (but not if we're just continuing rounds)
+      // We check if we don't have opponentPokemon yet, meaning it's a fresh opponent
+      if (!opponentPokemon) {
+        resetRoundState();
+        // Reset battle started tracker for new opponent
+        battleStartedForRoundRef.current = null;
+      }
+    }
+  }, [currentOpponentIndex, status, opponentPokemon, resetRoundState]);
+
   // Start battle when opponent index changes and we have all required data
   useEffect(() => {
     if (status !== "battling") {
@@ -357,33 +495,97 @@ export function useEliteFour(): UseEliteFourReturn {
       return;
     }
     
-    // We need to start a new battle if we don't have opponentPokemon yet
-    // OR if the battle is finished for the previous opponent and we've moved to next
-    const shouldStartBattle = !opponentPokemon || 
-      (battle.battle && battle.isBattleFinished() && lastProcessedOpponentIndexRef.current !== currentOpponentIndex);
-    
-    if (!shouldStartBattle) {
+    // Don't start if already loading or currently starting a battle
+    if (battle.isLoading || isStartingBattleRef.current) {
+      console.log("useEffect: Battle is loading or starting, skipping", { isLoading: battle.isLoading, isStarting: isStartingBattleRef.current });
       return;
     }
     
-    // Don't start if already loading
-    if (battle.isLoading) {
+    // Create a unique key for this round/opponent combo
+    const roundKey = `${currentOpponentIndex}-${currentRound}`;
+    
+    // Check matchup status first
+    const matchupComplete = roundWins.user === 2 || roundWins.opponent === 2;
+    if (matchupComplete) {
+      // Matchup is complete - don't start new battles
+      console.log("useEffect: Matchup complete, skipping");
       return;
     }
     
-    // Don't start if battle exists and is in progress
-    if (battle.battle && !battle.isBattleFinished()) {
+    // Check if we've already started a battle for this exact round
+    if (battleStartedForRoundRef.current === roundKey) {
+      // Battle already started for this round
+      if (battle.battle && !battle.isBattleFinished()) {
+        // Battle is still in progress - don't restart
+        console.log(`useEffect: Battle already in progress for ${roundKey}, skipping`);
+        return;
+      }
+      // Battle finished for this round
+      // If we're still on the same roundKey, the round hasn't advanced yet
+      // This means the battle result is being processed or round should advance
+      // Wait for processing or round advancement
+      console.log(`useEffect: Battle finished for ${roundKey}, waiting for round advancement`);
       return;
     }
     
-    console.log("useEffect: Triggering startNextBattle for opponent index:", currentOpponentIndex);
+    // We haven't started a battle for this round yet
+    // Check conditions to start a new battle
     
-    // Use a timeout to avoid calling in render
-    const timer = setTimeout(() => {
-      startNextBattle();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [status, currentOpponentIndex, userPokemon, config, opponentPokemon, battle.battle, battle.isLoading, battle.isBattleFinished, startNextBattle]);
+    const isNewOpponent = !opponentPokemon || 
+      (getCurrentOpponent() && opponentPokemon.id !== getCurrentOpponent()?.pokemonId);
+    const hasBattle = battle.battle !== null;
+    const battleFinished = hasBattle && battle.isBattleFinished();
+    
+    // Determine if we should start a battle
+    let shouldStart = false;
+    
+    if (isNewOpponent) {
+      // New opponent - always start
+      shouldStart = true;
+      console.log(`useEffect: New opponent detected, starting round ${currentRound}`);
+    } else if (!hasBattle) {
+      // No battle exists - start one
+      shouldStart = true;
+      console.log(`useEffect: No battle exists, starting round ${currentRound}`);
+    } else if (battleFinished) {
+      // Battle finished - we should start next round if matchup not complete
+      // The round should have advanced (currentRound incremented) after battle was processed
+      // If we're here with a new roundKey, it means the round advanced
+      shouldStart = true;
+      console.log(`useEffect: Battle finished, starting round ${currentRound}`);
+    }
+    
+    if (shouldStart) {
+      console.log(`useEffect: Starting battle for ${roundKey}`);
+      isStartingBattleRef.current = true;
+      
+      // Start the battle immediately (no setTimeout needed)
+      startNextBattle()
+        .then(() => {
+          // Mark that battle started successfully
+          battleStartedForRoundRef.current = roundKey;
+          console.log(`useEffect: Battle started successfully for ${roundKey}`);
+        })
+        .catch((error) => {
+          console.error("Error in startNextBattle:", error);
+          console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+          // Reset refs on error to allow retry
+          battleStartedForRoundRef.current = null;
+          isStartingBattleRef.current = false;
+        });
+      
+      // No cleanup needed since we're not using setTimeout
+      return;
+    } else {
+      console.log("useEffect: shouldStart is false, not starting battle", {
+        isNewOpponent,
+        hasBattle,
+        battleFinished,
+        roundKey,
+        currentRoundKey: battleStartedForRoundRef.current
+      });
+    }
+  }, [status, currentOpponentIndex, userPokemon, config, opponentPokemon, roundWins, currentRound, battle.battle, battle.isLoading, battle.isBattleFinished, startNextBattle, getCurrentOpponent]);
   
   return {
     status,
@@ -393,6 +595,8 @@ export function useEliteFour(): UseEliteFourReturn {
     defeatedOpponents,
     currentOpponent: getCurrentOpponent(),
     opponentPokemon,
+    roundWins,
+    currentRound,
     battle,
     startRun,
     startNextBattle,

@@ -117,7 +117,7 @@ export function BattleSimulatorClient() {
               disabled={isLoadingNames || isLoading1}
             />
             <button
-              onClick={() => handleSearch1()}
+              onClick={handleSearch1}
               disabled={isLoading1 || isLoadingNames}
               className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
             >
@@ -164,7 +164,7 @@ export function BattleSimulatorClient() {
               disabled={isLoadingNames || isLoading2}
             />
             <button
-              onClick={() => handleSearch2()}
+              onClick={handleSearch2}
               disabled={isLoading2 || isLoadingNames}
               className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
             >

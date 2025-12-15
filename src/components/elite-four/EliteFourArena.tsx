@@ -27,6 +27,8 @@ export function EliteFourArena() {
     defeatedOpponents,
     currentOpponent,
     opponentPokemon,
+    roundWins,
+    currentRound,
     battle,
     startRun,
     resetRun,
@@ -242,6 +244,8 @@ export function EliteFourArena() {
           defeatedOpponents={defeatedOpponents}
           userPokemon={userPokemon}
           opponentPokemon={opponentPokemonList}
+          currentRound={currentRound}
+          roundWins={roundWins}
         />
 
         {/* Opponent Title */}
@@ -249,6 +253,11 @@ export function EliteFourArena() {
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {currentOpponent.title}
+              {currentRound > 0 && (
+                <span className="ml-2 text-lg text-gray-600 dark:text-gray-400">
+                  - Round {currentRound}/3
+                </span>
+              )}
             </h2>
           </div>
         )}
@@ -395,7 +404,22 @@ export function EliteFourArena() {
     );
   }
 
-  // Loading state
+  // Loading state - show when status is battling but battleState is not ready
+  if (status === "battling") {
+    // Show loading if battle is loading or battleState is not available yet
+    if (isLoading || !battleState) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <div className="text-center">
+            <p className="text-lg text-gray-600 dark:text-gray-400">Loading battle...</p>
+            {isLoading && <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">Initializing battle...</p>}
+          </div>
+        </div>
+      );
+    }
+  }
+
+  // Fallback loading state
   return (
     <div className="flex items-center justify-center p-8">
       <div className="text-center">
