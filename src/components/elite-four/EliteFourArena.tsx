@@ -253,6 +253,8 @@ export function EliteFourArena() {
     const pokemon2 = getActivePokemon(1);
     const finished = isBattleFinished();
 
+    const isFinalRound = currentRound === 3 && roundWins.user === 1 && roundWins.opponent === 1;
+
     return (
       <div className="space-y-6">
         {/* Progress Indicator */}
@@ -271,12 +273,34 @@ export function EliteFourArena() {
           <div className="text-center">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
               {currentOpponent.title}
-              {currentRound > 0 && (
-                <span className="ml-2 text-lg text-gray-600 dark:text-gray-400">
-                  - Round {currentRound}/3
-                </span>
-              )}
             </h2>
+          </div>
+        )}
+
+        {/* Round Information - Moved here to be closer to battle */}
+        {currentOpponent && currentOpponentIndex !== null && (
+          <div className="rounded-lg border-2 border-purple-300 bg-white p-3 shadow-md dark:border-purple-600 dark:bg-gray-800">
+            <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                  {isFinalRound ? "Final Round" : `Round ${currentRound}/3`}
+                </span>
+                {isFinalRound && (
+                  <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                    (Deciding Round)
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-lg font-bold">
+                <span className="text-blue-600 dark:text-blue-400">
+                  You {roundWins.user}
+                </span>
+                <span className="text-gray-400">-</span>
+                <span className="text-red-600 dark:text-red-400">
+                  {roundWins.opponent} {currentOpponent.name}
+                </span>
+              </div>
+            </div>
           </div>
         )}
 
@@ -314,7 +338,7 @@ export function EliteFourArena() {
 
           {/* Mobile: Pokemon side by side, Controls below */}
           {/* Desktop: 3-column layout with controls between Pokemon */}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-6">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-6 items-stretch">
             {/* Left Pokemon (User) */}
             <div className="col-span-1 lg:col-span-1">
               {pokemon1 && (

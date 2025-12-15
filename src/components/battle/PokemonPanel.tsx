@@ -96,7 +96,7 @@ export function PokemonPanel({
         opacity: { duration: 0.3 },
         scale: { duration: 0.3 },
       }}
-      className={`relative rounded-xl border-2 border-gray-200 bg-white p-6 shadow-lg transition-all dark:border-gray-700 dark:bg-gray-800 ${
+      className={`relative flex flex-col h-full rounded-xl border-2 border-gray-200 bg-white p-6 shadow-lg transition-all dark:border-gray-700 dark:bg-gray-800 ${
         isFainted ? "grayscale" : ""
       }`}
       style={{
@@ -188,12 +188,12 @@ export function PokemonPanel({
 
       {/* Pokemon Info */}
       <div className="space-y-3">
-        {/* Name and Level */}
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold capitalize text-gray-900 dark:text-gray-100">
+        {/* Name and Level - Fixed height to accommodate 2 lines */}
+        <div className="flex min-h-[3rem] items-start justify-between">
+          <h3 className="text-xl font-bold capitalize leading-tight text-gray-900 dark:text-gray-100">
             {pokemon.name}
           </h3>
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="flex-shrink-0 text-sm text-gray-600 dark:text-gray-400">
             Lv. 50
           </span>
         </div>

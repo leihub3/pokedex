@@ -42,7 +42,6 @@ export function EliteFourProgress({
   };
 
   const currentOpponent = getCurrentOpponent();
-  const isFinalRound = currentRound === 3 && roundWins.user === 1 && roundWins.opponent === 1;
 
   return (
     <div className="mb-6 rounded-lg border-2 border-purple-500 bg-gradient-to-br from-purple-50 to-indigo-50 p-4 shadow-lg dark:from-purple-900/20 dark:to-indigo-900/20">
@@ -71,37 +70,8 @@ export function EliteFourProgress({
           </div>
         )}
       </div>
-
-      {/* Round Information */}
-      {currentOpponent && currentOpponentIndex !== null && (
-        <div className="mb-4 rounded-lg border border-purple-300 bg-white p-3 dark:border-purple-600 dark:bg-gray-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div>
-                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
-                  {isFinalRound ? "Final Round" : `Round ${currentRound}/3`}
-                </span>
-                {isFinalRound && (
-                  <span className="ml-2 text-xs font-bold text-red-600 dark:text-red-400">
-                    (Deciding Round)
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-lg font-bold">
-                <span className="text-blue-600 dark:text-blue-400">
-                  You {roundWins.user}
-                </span>
-                <span className="text-gray-400">-</span>
-                <span className="text-red-600 dark:text-red-400">
-                  {roundWins.opponent} {currentOpponent.name}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       
-      <div className="grid gap-3 md:grid-cols-5">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 md:grid-cols-5">
         {/* Elite Four Members */}
         {config.members.map((member, index) => {
           const defeated = isDefeated(member.id);
@@ -138,7 +108,7 @@ export function EliteFourProgress({
               )}
               
               <div className="flex flex-col items-center">
-                <div className="relative mb-2 h-16 w-16">
+                <div className="relative mb-1 h-12 w-12 sm:mb-2 sm:h-16 sm:w-16">
                   {pokemon ? (
                     <Image
                       src={
@@ -155,10 +125,10 @@ export function EliteFourProgress({
                     <div className="h-full w-full animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
                   )}
                 </div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                <p className="text-xs font-semibold text-gray-900 dark:text-gray-100 sm:text-sm">
                   {member.name}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 sm:text-xs">
                   Elite Four
                 </p>
               </div>
@@ -199,7 +169,7 @@ export function EliteFourProgress({
           )}
           
           <div className="flex flex-col items-center">
-            <div className="relative mb-2 h-16 w-16">
+            <div className="relative mb-1 h-12 w-12 sm:mb-2 sm:h-16 sm:w-16">
               {getOpponentPokemon(config.champion.pokemonId) ? (
                 <Image
                   src={
@@ -218,10 +188,10 @@ export function EliteFourProgress({
                 <div className="h-full w-full animate-pulse rounded-lg bg-gray-200 dark:bg-gray-700" />
               )}
             </div>
-            <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
+            <p className="text-xs font-bold text-gray-900 dark:text-gray-100 sm:text-sm">
               {config.champion.name}
             </p>
-            <p className="text-xs font-semibold text-yellow-600 dark:text-yellow-400">
+            <p className="text-[10px] font-semibold text-yellow-600 dark:text-yellow-400 sm:text-xs">
               Champion
             </p>
           </div>

@@ -151,7 +151,7 @@ export function EliteFourLobby({
         <h2 className="mb-6 text-center text-2xl font-bold text-gray-900 dark:text-gray-100">
           Your Challengers
         </h2>
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
           {config.members.map((member, index) => {
             const pokemon = opponentPokemon.find((p) => p.id === member.pokemonId);
             return (
