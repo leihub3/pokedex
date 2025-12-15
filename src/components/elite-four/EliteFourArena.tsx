@@ -295,10 +295,10 @@ export function EliteFourArena() {
           )}
 
           {/* Mobile: Pokemon side by side, Controls below */}
-          {/* Desktop: 3-column layout */}
+          {/* Desktop: 3-column layout with controls between Pokemon */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-6">
             {/* Left Pokemon (User) */}
-            <div className="col-span-1">
+            <div className="col-span-1 lg:col-span-1">
               {pokemon1 && (
                 <PokemonPanel
                   activePokemon={pokemon1}
@@ -320,31 +320,8 @@ export function EliteFourArena() {
               )}
             </div>
 
-            {/* Right Pokemon (Opponent) - Next to left on mobile, right column on desktop */}
-            <div className="col-span-1 lg:col-span-1">
-              {pokemon2 && (
-                <PokemonPanel
-                  activePokemon={pokemon2}
-                  spriteUrl={pokemon2Sprite}
-                  position="right"
-                  isAnimating={battle.isAnimating}
-                  isAttacking={pokemon2Attacking}
-                  attackType={pokemon2AttackType}
-                  onAttackComplete={() => {
-                    setPokemon2Attacking(false);
-                    setPokemon2AttackType(null);
-                  }}
-                  isTakingDamage={pokemon2TakingDamage}
-                  onDamageComplete={() => {
-                    setPokemon2TakingDamage(false);
-                  }}
-                  speedMultiplier={animationSpeed}
-                />
-              )}
-            </div>
-
-            {/* Center: Move Selector & Controls - Below Pokemon on mobile, center column on desktop */}
-            <div className="col-span-2 lg:col-span-1 space-y-4">
+            {/* Center: Move Selector & Controls - Below Pokemon on mobile, between Pokemon on desktop */}
+            <div className="col-span-2 lg:col-span-1 order-3 lg:order-2 space-y-4">
               <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-800">
                 <h3 className="mb-4 text-center text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Turn {battleState.turnNumber}
@@ -388,6 +365,29 @@ export function EliteFourArena() {
                 animationSpeed={animationSpeed}
                 onSpeedChange={setAnimationSpeed}
               />
+            </div>
+
+            {/* Right Pokemon (Opponent) - Next to left on mobile, right column on desktop */}
+            <div className="col-span-1 lg:col-span-1 order-2 lg:order-3">
+              {pokemon2 && (
+                <PokemonPanel
+                  activePokemon={pokemon2}
+                  spriteUrl={pokemon2Sprite}
+                  position="right"
+                  isAnimating={battle.isAnimating}
+                  isAttacking={pokemon2Attacking}
+                  attackType={pokemon2AttackType}
+                  onAttackComplete={() => {
+                    setPokemon2Attacking(false);
+                    setPokemon2AttackType(null);
+                  }}
+                  isTakingDamage={pokemon2TakingDamage}
+                  onDamageComplete={() => {
+                    setPokemon2TakingDamage(false);
+                  }}
+                  speedMultiplier={animationSpeed}
+                />
+              )}
             </div>
           </div>
         </div>
