@@ -34,33 +34,50 @@ interface EliteFourCareerStore {
 
 export const useEliteFourCareerStore = create<EliteFourCareerStore>()(
   persist(
-    (set, get) => ({
-      gameMode: "free",
-      setGameMode: (mode) => set({ gameMode: mode }),
-
-      careerProgress: {
+    (set, get) => {
+      // Force unlock Master Mode for testing (uncomment next line to enable)
+      const FORCE_UNLOCK_MASTER_MODE = false;
+      
+      const defaultProgress = {
         unlockedRegions: ["kanto"], // Kanto unlocked by default
         completedRegions: [],
         currentRegion: "kanto",
-        masterModeUnlocked: false,
+        masterModeUnlocked: FORCE_UNLOCK_MASTER_MODE, // Unlocked for testing
         masterModeCompleted: false,
         masterModeCurrentRegionIndex: 0,
         masterModeRegionsCompleted: [],
-      },
+      };
+      
+      return {
+        gameMode: "free",
+        setGameMode: (mode: GameMode) => set({ gameMode: mode }),
 
-      unlockRegion: (regionId) => {
-        const progress = get().careerProgress;
+        careerProgress: defaultProgress,
+
+        unlockRegion: (regionId: string) => {
+          const progress = get().careerProgress;
+          const FORCE_UNLOCK_MASTER_MODE = false; // For testing
+        
         if (!progress.unlockedRegions.includes(regionId)) {
           set({
             careerProgress: {
               ...progress,
               unlockedRegions: [...progress.unlockedRegions, regionId],
+              masterModeUnlocked: FORCE_UNLOCK_MASTER_MODE || progress.masterModeUnlocked, // Always unlocked for testing
+            },
+          });
+        } else if (FORCE_UNLOCK_MASTER_MODE && !progress.masterModeUnlocked) {
+          // Also ensure Master Mode is unlocked when unlocking regions
+          set({
+            careerProgress: {
+              ...progress,
+              masterModeUnlocked: true,
             },
           });
         }
       },
 
-      completeRegion: (regionId) => {
+      completeRegion: (regionId: string) => {
         const progress = get().careerProgress;
         const isNewlyCompleted = !progress.completedRegions.includes(regionId);
 
@@ -121,6 +138,7 @@ export const useEliteFourCareerStore = create<EliteFourCareerStore>()(
             ...get().careerProgress,
             masterModeCurrentRegionIndex: 0,
             masterModeRegionsCompleted: [],
+            masterModeCompleted: false, // Reset completion status
           },
         });
       },
@@ -151,11 +169,11 @@ export const useEliteFourCareerStore = create<EliteFourCareerStore>()(
         return uncompleted?.id || null;
       },
 
-      isRegionUnlocked: (regionId) => {
+      isRegionUnlocked: (regionId: string) => {
         return get().careerProgress.unlockedRegions.includes(regionId);
       },
 
-      isRegionCompleted: (regionId) => {
+      isRegionCompleted: (regionId: string) => {
         return get().careerProgress.completedRegions.includes(regionId);
       },
 
@@ -203,9 +221,35 @@ export const useEliteFourCareerStore = create<EliteFourCareerStore>()(
           completed: progress.masterModeRegionsCompleted.length,
         };
       },
-    }),
+    };
+  },
     {
       name: "pokemon-elite-four-career",
+      // Custom merge function to force unlock Master Mode for testing
+      merge: (persistedState: any, currentState: any) => {
+        const FORCE_UNLOCK_MASTER_MODE = false; // For testing
+        
+        if (persistedState?.careerProgress) {
+          // Only merge the careerProgress, keep all functions from currentState
+          const allRegions = getAllEliteFourConfigs();
+          const hasCompletedAllRegions = persistedState.careerProgress.completedRegions.length >= allRegions.length;
+          
+          // Master Mode should only be unlocked if:
+          // 1. FORCE_UNLOCK_MASTER_MODE is true (for testing), OR
+          // 2. Player has legitimately completed all 6 regions
+          const shouldBeUnlocked = FORCE_UNLOCK_MASTER_MODE || hasCompletedAllRegions;
+          
+          return {
+            ...currentState, // Keep all functions from current state
+            careerProgress: {
+              ...persistedState.careerProgress,
+              masterModeUnlocked: shouldBeUnlocked,
+            },
+          };
+        }
+        // If no persisted state, use current state
+        return currentState;
+      },
     }
   )
 );

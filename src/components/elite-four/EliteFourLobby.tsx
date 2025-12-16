@@ -36,6 +36,8 @@ export function EliteFourLobby({
     startMasterMode,
     getMasterModeCurrentRegion,
   } = useEliteFourCareerStore();
+  
+  const [showRestartConfirm, setShowRestartConfirm] = useState(false);
 
   const availableRegions = getAllEliteFourConfigs();
 
@@ -267,9 +269,19 @@ export function EliteFourLobby({
           Select Region:
         </label>
         {gameMode === "master" ? (
-          <div className="rounded-lg border border-purple-300 bg-purple-50 p-3 text-center text-sm text-purple-800 dark:border-purple-600 dark:bg-purple-900/30 dark:text-purple-300">
-            Master Mode: Region {careerProgress.masterModeCurrentRegionIndex + 1} of {getAllEliteFourConfigs().length}
-            {getMasterModeCurrentRegion() && ` - ${getMasterModeCurrentRegion()?.name}`}
+          <div className="space-y-3">
+            <div className="rounded-lg border border-purple-300 bg-purple-50 p-3 text-center text-sm text-purple-800 dark:border-purple-600 dark:bg-purple-900/30 dark:text-purple-300">
+              Master Mode: Region {careerProgress.masterModeCurrentRegionIndex + 1} of {getAllEliteFourConfigs().length}
+              {getMasterModeCurrentRegion() && ` - ${getMasterModeCurrentRegion()?.name}`}
+            </div>
+            {careerProgress.masterModeRegionsCompleted.length > 0 && (
+              <button
+                onClick={() => setShowRestartConfirm(true)}
+                className="w-full rounded-lg border-2 border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 dark:border-red-600 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+              >
+                Restart Master Mode
+              </button>
+            )}
           </div>
         ) : (
           <select
@@ -298,6 +310,47 @@ export function EliteFourLobby({
           </p>
         )}
       </motion.div>
+
+      {/* Restart Confirmation Dialog */}
+      {showRestartConfirm && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowRestartConfirm(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-lg border-2 border-red-300 bg-white p-6 shadow-xl dark:border-red-600 dark:bg-gray-800"
+          >
+            <h3 className="mb-4 text-xl font-bold text-gray-900 dark:text-gray-100">
+              Restart Master Mode?
+            </h3>
+            <p className="mb-6 text-gray-600 dark:text-gray-400">
+              This will reset your current Master Mode progress and start from Kanto. All progress in this Master Mode run will be lost. Are you sure?
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => {
+                  startMasterMode();
+                  setShowRestartConfirm(false);
+                }}
+                className="flex-1 rounded-lg bg-red-500 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-600"
+              >
+                Yes, Restart
+              </button>
+              <button
+                onClick={() => setShowRestartConfirm(false)}
+                className="flex-1 rounded-lg border-2 border-gray-300 bg-white px-4 py-2 font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
 
       {/* Career Progress (shown in Career Mode or if any progress exists) */}
       {(gameMode === "career" || careerProgress.completedRegions.length > 0) && (

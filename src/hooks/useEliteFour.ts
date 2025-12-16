@@ -72,6 +72,8 @@ export function useEliteFour(): UseEliteFourReturn {
   const battleStartedForRoundRef = useRef<string | null>(null);
   // Track if we're currently in the process of starting a battle (to prevent cleanup from canceling)
   const isStartingBattleRef = useRef<boolean>(false);
+  // Track auto-advance timeout for Master Mode
+  const masterModeAutoAdvanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   /**
    * Get current opponent (member or champion)
@@ -243,18 +245,71 @@ export function useEliteFour(): UseEliteFourReturn {
           // Track region completion based on mode
           if (gameMode === "career" && config) {
             completeRegion(config.id);
+            setStatus("victory");
           } else if (gameMode === "master" && config) {
+            // Get progress BEFORE updating to avoid React render issues
+            const currentProgress = getMasterModeProgress();
+            const currentCompletedCount = currentProgress.completed;
+            const totalRegions = currentProgress.total;
+            
+            // Complete the region
             completeMasterModeRegion(config.id);
             
-            // Check if Master Mode is complete
-            const progress = getMasterModeProgress();
-            if (progress.completed >= progress.total) {
-              // Master Mode complete!
+            // Calculate if complete (will be currentCompletedCount + 1 after update)
+            const willBeComplete = (currentCompletedCount + 1) >= totalRegions;
+            
+            if (willBeComplete) {
+              // Master Mode complete! Show completion screen
               console.log("🏆 Master Mode completed!");
+              setStatus("victory");
+            } else {
+              // Master Mode not complete - need to get next region after a brief delay
+              // Use setTimeout to defer the state reads to avoid render issues
+              setTimeout(() => {
+                const nextRegion = getMasterModeCurrentRegion();
+                if (nextRegion && userPokemon && userSelectedMoves) {
+                  console.log(`→ Master Mode: Auto-advancing to ${nextRegion.name} in 3 seconds...`);
+                  
+                  // Clear any existing timeout
+                  if (masterModeAutoAdvanceTimeoutRef.current) {
+                    clearTimeout(masterModeAutoAdvanceTimeoutRef.current);
+                  }
+                  
+                  // Set auto-advance timeout (3 seconds)
+                  masterModeAutoAdvanceTimeoutRef.current = setTimeout(() => {
+                    console.log(`→ Master Mode: Starting ${nextRegion.name}`);
+                    
+                    // Reset state for next region
+                    resetRoundState();
+                    setOpponentPokemon(null);
+                    setDefeatedOpponents([]);
+                    setCurrentOpponentIndex(0);
+                    
+                    // Reset battle state
+                    battle.resetBattle();
+                    battleProcessedRef.current = null;
+                    lastProcessedOpponentIndexRef.current = null;
+                    battleStartedForRoundRef.current = null;
+                    isStartingBattleRef.current = false;
+                    
+                    // Start next region with same Pokemon and moves
+                    setConfig(nextRegion);
+                    setStatus("battling");
+                    
+                    // Clear the timeout ref
+                    masterModeAutoAdvanceTimeoutRef.current = null;
+                    
+                    // Battle will start via useEffect when config and status change
+                  }, 3000); // 3 second delay
+                }
+              }, 0); // Defer to next tick
+              
+              // Show victory screen
+              setStatus("victory");
             }
+          } else {
+            setStatus("victory");
           }
-          
-          setStatus("victory");
         } else {
           // Not the champion yet - continue to next opponent
           console.log(`→ Matchup won! Moving to next opponent. Current index: ${currentOpponentIndex}, Next index: ${currentOpponentIndex + 1}`);
@@ -336,6 +391,12 @@ export function useEliteFour(): UseEliteFourReturn {
    * Reset to lobby state
    */
   const resetRun = useCallback(() => {
+    // Clear auto-advance timeout if exists
+    if (masterModeAutoAdvanceTimeoutRef.current) {
+      clearTimeout(masterModeAutoAdvanceTimeoutRef.current);
+      masterModeAutoAdvanceTimeoutRef.current = null;
+    }
+    
     setStatus("lobby");
     setCurrentOpponentIndex(null);
     setUserPokemon(null);
@@ -349,6 +410,15 @@ export function useEliteFour(): UseEliteFourReturn {
     battleStartedForRoundRef.current = null; // Reset battle started tracker
     battle.resetBattle();
   }, [battle, resetRoundState]);
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (masterModeAutoAdvanceTimeoutRef.current) {
+        clearTimeout(masterModeAutoAdvanceTimeoutRef.current);
+      }
+    };
+  }, []);
   
   /**
    * Check if current battle is against Champion

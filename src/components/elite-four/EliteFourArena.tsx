@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { useEliteFour } from "@/hooks/useEliteFour";
 import { EliteFourLobby } from "./EliteFourLobby";
 import { EliteFourProgress } from "./EliteFourProgress";
@@ -16,9 +17,11 @@ import { calculateMoveEffectiveness, type Effectiveness } from "@/lib/utils/batt
 import { getAllEliteFourConfigs } from "@/data/eliteFour";
 import type { Pokemon as APIPokemon } from "@/types/api";
 import type { AnimationSpeed } from "@/hooks/useBattleAnimation";
+import { useEliteFourCareerStore } from "@/store/eliteFourCareerStore";
 
 export function EliteFourArena() {
   const eliteFour = useEliteFour();
+  const { gameMode, getMasterModeProgress } = useEliteFourCareerStore();
   const {
     status,
     currentOpponentIndex,
@@ -261,9 +264,53 @@ export function EliteFourArena() {
     const finished = isBattleFinished();
 
     const isFinalRound = currentRound === 3 && roundWins.user === 1 && roundWins.opponent === 1;
+    const isMasterMode = gameMode === "master";
+    const masterModeProgress = isMasterMode ? getMasterModeProgress() : null;
 
     return (
       <div className="space-y-6">
+        {/* Master Mode Progress Indicator */}
+        {isMasterMode && masterModeProgress && config && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-lg border-2 border-purple-400 bg-gradient-to-r from-purple-50 to-indigo-50 p-4 shadow-lg dark:from-purple-900/30 dark:to-indigo-900/30"
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">👑</span>
+                <span className="text-lg font-bold text-purple-700 dark:text-purple-300">
+                  Master Mode
+                </span>
+              </div>
+              <span className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+                Region {masterModeProgress.current} of {masterModeProgress.total}
+              </span>
+            </div>
+            <div className="mb-2">
+              <div className="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                {config.name}
+              </div>
+            </div>
+            <div className="h-3 w-full overflow-hidden rounded-full bg-purple-200 dark:bg-purple-900/50">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${(masterModeProgress.completed / masterModeProgress.total) * 100}%` }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="h-full bg-gradient-to-r from-purple-500 to-indigo-500"
+              />
+            </div>
+            <div className="mt-2 flex justify-between text-xs text-purple-600 dark:text-purple-400">
+              <span>
+                Completed: {masterModeProgress.completed}/{masterModeProgress.total} regions
+              </span>
+              <span>
+                Current: {masterModeProgress.current}/{masterModeProgress.total}
+              </span>
+            </div>
+          </motion.div>
+        )}
+
         {/* Progress Indicator */}
         <EliteFourProgress
           config={config}
