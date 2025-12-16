@@ -84,3 +84,5 @@ export function calculateStatValue(baseStat: number, stage: number): number {
   return Math.floor(baseStat * multiplier);
 }
 
+
+

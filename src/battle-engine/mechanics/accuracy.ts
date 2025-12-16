@@ -17,3 +17,5 @@ export function checkAccuracy(move: Move, rng: SeededRNG): boolean {
   return rng.chance(move.accuracy / 100);
 }
 
+
+

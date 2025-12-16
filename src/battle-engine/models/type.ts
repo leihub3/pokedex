@@ -42,3 +42,5 @@ export function normalizeType(type: string): PokemonType {
   return "normal";
 }
 
+
+

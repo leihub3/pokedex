@@ -50,3 +50,5 @@ export function isSpecialMove(move: Move): boolean {
   return move.damageClass === "special";
 }
 
+
+

@@ -35,3 +35,5 @@ export function canActWithParalysis(rng: SeededRNG): boolean {
   return !rng.chance(PARALYSIS_SKIP_CHANCE);
 }
 
+
+

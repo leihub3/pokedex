@@ -60,3 +60,5 @@ export function HPBar({ currentHP, maxHP, pokemonName }: HPBarProps) {
   );
 }
 
+
+

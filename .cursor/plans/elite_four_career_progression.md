@@ -294,3 +294,5 @@ Display component showing:
 - [ ] Career progress persists across sessions
 - [ ] Reset career function works correctly
 
+
+

@@ -16,3 +16,5 @@ export function getTypeEffectiveness(
   return calculateEffectiveness(moveType, defendingTypes);
 }
 
+
+

@@ -42,3 +42,5 @@ export function burnAffectsDamage(move: Move): boolean {
   return isPhysicalMove(move);
 }
 
+
+

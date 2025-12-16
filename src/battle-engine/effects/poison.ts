@@ -17,3 +17,5 @@ export function getPoisonHPLoss(maxHP: number): number {
   return Math.max(1, loss);
 }
 
+
+

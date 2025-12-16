@@ -96,3 +96,5 @@ export function getBattleLog(battle: Battle): BattleEvent[] {
   return battle.state.log;
 }
 
+
+

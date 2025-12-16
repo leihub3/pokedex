@@ -39,3 +39,5 @@ const blazeAbility = createAbility("blaze", {
 // Register the ability
 registerAbility(blazeAbility);
 
+
+
