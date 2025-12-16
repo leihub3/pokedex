@@ -469,17 +469,6 @@ export function EliteFourArena() {
 
             {/* Right Pokemon (Opponent) - Next to left on mobile, right column on desktop */}
             <div className="relative col-span-1 lg:col-span-1 order-2 lg:order-3">
-              {/* Effectiveness Indicator - Above opponent on mobile */}
-              {effectiveness !== null && effectiveness !== 1 && (
-                <div className="pointer-events-none fixed left-1/2 top-20 z-50 -translate-x-1/2 lg:hidden" style={{ width: 'min(90vw, 100%)', maxWidth: '100%' }}>
-                  <div className="flex justify-center">
-                    <EffectivenessIndicator
-                      effectiveness={effectiveness}
-                      speedMultiplier={animationSpeed}
-                    />
-                  </div>
-                </div>
-              )}
               {pokemon2 && (
                 <PokemonPanel
                   activePokemon={pokemon2}

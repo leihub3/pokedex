@@ -244,8 +244,11 @@ export function useEliteFour(): UseEliteFourReturn {
           
           // Track region completion based on mode
           if (gameMode === "career" && config) {
-            completeRegion(config.id);
-            setStatus("victory");
+            // Use setTimeout to defer both store update and state update to avoid React render issues
+            setTimeout(() => {
+              completeRegion(config.id);
+              setStatus("victory");
+            }, 0);
           } else if (gameMode === "master" && config) {
             // Get progress BEFORE updating to avoid React render issues
             const currentProgress = getMasterModeProgress();

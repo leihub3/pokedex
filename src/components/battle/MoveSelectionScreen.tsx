@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/Badge";
 import { LoaderSpinner } from "@/components/ui/LoaderSpinner";
@@ -14,6 +14,8 @@ interface MoveSelectionScreenProps {
   onConfirm: (selectedMoves: EngineMove[]) => void;
   onCancel?: () => void;
   isLoading?: boolean;
+  initialSelectedMoveIds?: number[]; // Pre-select these moves if provided
+  showSavedIndicator?: boolean; // Show indicator if moves are from saved selection
 }
 
 type SortOption = "power-desc" | "power-asc" | "name" | "accuracy-desc";
@@ -24,14 +26,28 @@ export function MoveSelectionScreen({
   onConfirm,
   onCancel,
   isLoading = false,
+  initialSelectedMoveIds = [],
+  showSavedIndicator = false,
 }: MoveSelectionScreenProps) {
-  const [selectedMoveIds, setSelectedMoveIds] = useState<Set<number>>(new Set());
+  const [selectedMoveIds, setSelectedMoveIds] = useState<Set<number>>(
+    () => new Set(initialSelectedMoveIds.filter(id => availableMoves.some(m => m.id === id)))
+  );
   const [sortBy, setSortBy] = useState<SortOption>("power-desc");
   const [powerFilter, setPowerFilter] = useState<PowerFilter>("all");
   const [damageClassFilter, setDamageClassFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   
   const MAX_SELECTED = 4;
+
+  // Update selected moves when initialSelectedMoveIds or availableMoves change
+  useEffect(() => {
+    if (initialSelectedMoveIds.length > 0) {
+      const validIds = initialSelectedMoveIds.filter(id => availableMoves.some(m => m.id === id));
+      if (validIds.length > 0) {
+        setSelectedMoveIds(new Set(validIds.slice(0, MAX_SELECTED)));
+      }
+    }
+  }, [initialSelectedMoveIds, availableMoves]);
 
   // Filter and sort moves
   const filteredAndSortedMoves = useMemo(() => {
@@ -196,6 +212,11 @@ export function MoveSelectionScreen({
         <h2 className="mb-2 text-2xl font-bold text-gray-900 dark:text-gray-100">
           Select 4 Moves
         </h2>
+        {showSavedIndicator && initialSelectedMoveIds.length > 0 && selectedMoveIds.size === MAX_SELECTED && (
+          <p className="mb-2 text-sm text-green-600 dark:text-green-400">
+            ✓ Your previous move selection has been restored
+          </p>
+        )}
         <p className="text-gray-600 dark:text-gray-400">
           {selectedMoveIds.size} / {MAX_SELECTED} moves selected
         </p>

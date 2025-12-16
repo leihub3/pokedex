@@ -14,6 +14,7 @@ import { getAllEliteFourConfigs } from "@/data/eliteFour";
 import type { Move as EngineMove } from "@/battle-engine";
 import { useEliteFourCareerStore } from "@/store/eliteFourCareerStore";
 import { EliteFourCareerProgress } from "./EliteFourCareerProgress";
+import { usePokemonMoveMemory } from "@/hooks/usePokemonMoveMemory";
 import Image from "next/image";
 
 interface EliteFourLobbyProps {
@@ -38,6 +39,12 @@ export function EliteFourLobby({
   } = useEliteFourCareerStore();
   
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Track if component is mounted to avoid hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const availableRegions = getAllEliteFourConfigs();
 
@@ -87,6 +94,21 @@ export function EliteFourLobby({
   const [availableMoves, setAvailableMoves] = useState<APIMove[]>([]);
   const [isLoadingMoves, setIsLoadingMoves] = useState(false);
   const [showMoveSelection, setShowMoveSelection] = useState(false);
+  const [initialSelectedMoveIds, setInitialSelectedMoveIds] = useState<number[]>([]);
+
+  // Hook to manage Pokemon move memory
+  const { getSavedMoves, saveMovesFromEngineMoves, hasSavedMoves, getRecentPokemon, getLastPokemon } = usePokemonMoveMemory();
+  
+  // Get recent Pokemon for autocomplete suggestions
+  const recentPokemon = getRecentPokemon();
+  
+  // Load last selected Pokemon on mount
+  useEffect(() => {
+    const lastPokemon = getLastPokemon();
+    if (lastPokemon && !userPokemon && !search) {
+      setSearch(lastPokemon);
+    }
+  }, []); // Only run on mount
 
   // Load all Pokémon names for autocomplete
   useEffect(() => {
@@ -95,6 +117,12 @@ export function EliteFourLobby({
         const response = await getAllPokemonList();
         const names = response.results.map((item: PokemonListItem) => item.name);
         setAllPokemonNames(names);
+        
+        // After loading names, check for last Pokemon and set it
+        const lastPokemon = getLastPokemon();
+        if (lastPokemon && !userPokemon && !search) {
+          setSearch(lastPokemon);
+        }
       } catch (error) {
         console.error("Error loading Pokémon names:", error);
       } finally {
@@ -129,9 +157,13 @@ export function EliteFourLobby({
     setError(null);
     setShowMoveSelection(false);
     setAvailableMoves([]);
+    setInitialSelectedMoveIds([]);
     try {
       const pokemon = await getPokemonById(term.toLowerCase());
       setUserPokemon(pokemon);
+      
+      // Check for saved move selections
+      const savedMoveIds = getSavedMoves(pokemon.id);
       
       // Load available moves for move selection
       setIsLoadingMoves(true);
@@ -139,6 +171,13 @@ export function EliteFourLobby({
         const moves = await getAvailablePokemonMoves(pokemon);
         setAvailableMoves(moves);
         if (moves.length > 0) {
+          // If we have saved moves and they're still available, pre-select them
+          if (savedMoveIds && savedMoveIds.length > 0) {
+            const validSavedIds = savedMoveIds.filter(id => moves.some(m => m.id === id));
+            if (validSavedIds.length > 0) {
+              setInitialSelectedMoveIds(validSavedIds.slice(0, 4));
+            }
+          }
           setShowMoveSelection(true);
         } else {
           setError("This Pokémon has no available moves.");
@@ -158,6 +197,7 @@ export function EliteFourLobby({
       setUserPokemon(null);
       setShowMoveSelection(false);
       setAvailableMoves([]);
+      setInitialSelectedMoveIds([]);
     } finally {
       setIsLoadingPokemon(false);
     }
@@ -165,6 +205,9 @@ export function EliteFourLobby({
 
   const handleMoveConfirm = (selectedMoves: EngineMove[]) => {
     if (userPokemon && selectedMoves.length === 4) {
+      // Save the move selection for future use (with Pokemon name)
+      saveMovesFromEngineMoves(userPokemon.id, userPokemon.name, selectedMoves);
+      
       // Pass the current selected config to onStart
       onStart(userPokemon, selectedMoves, currentConfig);
     }
@@ -291,14 +334,16 @@ export function EliteFourLobby({
             className="w-full rounded-lg border border-gray-300 bg-white p-2 text-gray-900 transition-colors hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:border-blue-500"
           >
             {selectableRegions.map((region) => {
-              const isUnlocked = isRegionUnlocked(region.id);
-              const isCompleted = careerProgress.completedRegions.includes(region.id);
+              // During SSR, assume all regions are unlocked to avoid hydration mismatch
+              const isUnlocked = isMounted ? isRegionUnlocked(region.id) : true;
+              const isCompleted = isMounted ? careerProgress.completedRegions.includes(region.id) : false;
+              const isCurrent = isMounted && gameMode === "career" && careerProgress.currentRegion === region.id;
               return (
                 <option key={region.id} value={region.id} disabled={!isUnlocked}>
                   {region.name}
                   {!isUnlocked && " 🔒"}
                   {isCompleted && " ✓"}
-                  {gameMode === "career" && careerProgress.currentRegion === region.id && " (Current)"}
+                  {isCurrent && " (Current)"}
                 </option>
               );
             })}
@@ -466,6 +511,8 @@ export function EliteFourLobby({
               onSelect={handleSearch}
               placeholder="Search your Pokémon..."
               disabled={isLoadingNames || isLoadingPokemon || isStarting}
+              recentOptions={recentPokemon.map(p => p.name)}
+              maxSuggestions={8}
             />
           </div>
           <button
@@ -536,6 +583,8 @@ export function EliteFourLobby({
             onConfirm={handleMoveConfirm}
             onCancel={handleMoveCancel}
             isLoading={isStarting || isLoadingMoves}
+            initialSelectedMoveIds={initialSelectedMoveIds}
+            showSavedIndicator={userPokemon ? hasSavedMoves(userPokemon.id) : false}
           />
         </motion.div>
       )}

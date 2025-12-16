@@ -4,6 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 
+interface RecentOption {
+  value: string;
+  label: string;
+  isRecent?: boolean;
+}
+
 interface AutocompleteInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -13,6 +19,7 @@ interface AutocompleteInputProps {
   className?: string;
   maxSuggestions?: number;
   disabled?: boolean;
+  recentOptions?: string[]; // Show these first when input is empty or focused
 }
 
 export function AutocompleteInput({
@@ -24,8 +31,9 @@ export function AutocompleteInput({
   className,
   maxSuggestions = 5,
   disabled = false,
+  recentOptions = [],
 }: AutocompleteInputProps) {
-  const [filteredOptions, setFilteredOptions] = useState<string[]>([]);
+  const [filteredOptions, setFilteredOptions] = useState<RecentOption[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -37,15 +45,25 @@ export function AutocompleteInput({
         .filter((option) =>
           option.toLowerCase().includes(value.toLowerCase())
         )
-        .slice(0, maxSuggestions);
+        .slice(0, maxSuggestions)
+        .map((opt) => ({ value: opt, label: opt, isRecent: false }));
       setFilteredOptions(filtered);
       setIsOpen(filtered.length > 0);
     } else {
-      setFilteredOptions([]);
-      setIsOpen(false);
+      // Show recent options when input is empty
+      if (recentOptions.length > 0) {
+        const recent = recentOptions
+          .slice(0, maxSuggestions)
+          .map((opt) => ({ value: opt, label: opt, isRecent: true }));
+        setFilteredOptions(recent);
+        setIsOpen(true);
+      } else {
+        setFilteredOptions([]);
+        setIsOpen(false);
+      }
     }
     setHighlightedIndex(-1);
-  }, [value, options, maxSuggestions]);
+  }, [value, options, maxSuggestions, recentOptions]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -71,6 +89,10 @@ export function AutocompleteInput({
       }
     }, 0);
   };
+  
+  const handleOptionSelect = (option: RecentOption) => {
+    handleSelect(option.value);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen || filteredOptions.length === 0) {
@@ -94,9 +116,9 @@ export function AutocompleteInput({
       case "Enter":
         e.preventDefault();
         if (highlightedIndex >= 0) {
-          handleSelect(filteredOptions[highlightedIndex]);
+          handleSelect(filteredOptions[highlightedIndex].value);
         } else if (filteredOptions.length > 0) {
-          handleSelect(filteredOptions[0]);
+          handleSelect(filteredOptions[0].value);
         } else if (onSelect) {
           onSelect(value);
         }
@@ -117,7 +139,7 @@ export function AutocompleteInput({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onFocus={() => {
-          if (filteredOptions.length > 0) {
+          if (filteredOptions.length > 0 || recentOptions.length > 0) {
             setIsOpen(true);
           }
         }}
@@ -135,18 +157,27 @@ export function AutocompleteInput({
             className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800"
           >
             <ul className="max-h-60 overflow-auto py-1">
+              {filteredOptions.length > 0 && filteredOptions[0]?.isRecent && (
+                <li className="px-4 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400">
+                  Recent Pokémon
+                </li>
+              )}
               {filteredOptions.map((option, index) => (
                 <li
-                  key={option}
-                  onClick={() => handleSelect(option)}
+                  key={option.value}
+                  onClick={() => handleOptionSelect(option)}
                   className={cn(
                     "cursor-pointer px-4 py-2 capitalize transition-colors",
                     index === highlightedIndex
                       ? "bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-100"
-                      : "text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
+                      : "text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700",
+                    option.isRecent && "flex items-center gap-2"
                   )}
                 >
-                  {option.replace(/-/g, " ")}
+                  {option.isRecent && (
+                    <span className="text-xs text-gray-400">🕒</span>
+                  )}
+                  {option.label.replace(/-/g, " ")}
                 </li>
               ))}
             </ul>
