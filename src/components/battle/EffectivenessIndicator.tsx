@@ -57,7 +57,11 @@ export function EffectivenessIndicator({
         }}
       >
         <motion.p
-          className="whitespace-nowrap text-2xl font-bold"
+          className="whitespace-nowrap text-xl font-bold sm:text-2xl text-center"
+          style={{ 
+            wordBreak: 'keep-all',
+            overflowWrap: 'normal',
+          }}
           animate={
             effectiveness === 0 && !prefersReducedMotion
               ? {
