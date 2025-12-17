@@ -10,6 +10,7 @@ import { BattleControls } from "./BattleControls";
 import { EffectivenessIndicator } from "./EffectivenessIndicator";
 import { TypeParticles } from "./TypeParticles";
 import { BattleSummaryScreen } from "./BattleSummaryScreen";
+import { BattleIntro } from "./BattleIntro";
 import { BattleStatsDisplay } from "./BattleStatsDisplay";
 import { calculateMoveEffectiveness, type Effectiveness } from "@/lib/utils/battleHelpers";
 import { useBattleStats } from "@/hooks/useBattleStats";
@@ -44,6 +45,7 @@ export function BattleArena() {
     useState<APIPokemon | null>(null);
   const [animationSpeed, setAnimationSpeed] = useState<AnimationSpeed>(1);
   const [showSummary, setShowSummary] = useState(false);
+  const [showIntro, setShowIntro] = useState(false);
   const [pokemon1DamageAmount, setPokemon1DamageAmount] = useState(0);
   const [pokemon2DamageAmount, setPokemon2DamageAmount] = useState(0);
   const [pokemon1PreviousHP, setPokemon1PreviousHP] = useState<number | undefined>(undefined);
@@ -203,17 +205,42 @@ export function BattleArena() {
     }
   };
 
-  const handlePokemonSelected = async (
+  const handlePokemonSelected = (
     pokemon1: APIPokemon,
     pokemon2: APIPokemon
   ) => {
     setSelectedPokemon1(pokemon1);
     setSelectedPokemon2(pokemon2);
+    battleStats.reset();
+    setShowIntro(true);
+  };
+
+  const getPokemonSprite = (pokemon: APIPokemon | null): string | null => {
+    if (!pokemon) return null;
+    // Prefer official artwork, fallback to default sprite
+    const other = (pokemon as any).sprites?.other;
+    const official =
+      other?.["official-artwork"]?.front_default ||
+      other?.dream_world?.front_default;
+    return (
+      official ||
+      (pokemon as any).sprites?.front_default ||
+      (pokemon as any).sprites?.front_shiny ||
+      null
+    );
+  };
+
+  const handleIntroComplete = async () => {
+    if (!selectedPokemon1 || !selectedPokemon2) {
+      setShowIntro(false);
+      return;
+    }
     try {
-      await startBattle(pokemon1, pokemon2);
+      await startBattle(selectedPokemon1, selectedPokemon2);
     } catch (error) {
       console.error("Failed to start battle:", error);
-      // Error handling could show a toast/alert here
+    } finally {
+      setShowIntro(false);
     }
   };
 
@@ -223,6 +250,7 @@ export function BattleArena() {
     setSelectedPokemon1(null);
     setSelectedPokemon2(null);
     setShowSummary(false);
+    setShowIntro(false);
     // Reset animation states
     setPokemon1Attacking(false);
     setPokemon2Attacking(false);
@@ -263,6 +291,19 @@ export function BattleArena() {
 
   // Show selection UI if battle not started
   if (!battle || !battleState) {
+    if (showIntro && selectedPokemon1 && selectedPokemon2) {
+      return (
+        <BattleIntro
+          pokemon1Name={selectedPokemon1.name}
+          pokemon2Name={selectedPokemon2.name}
+          pokemon1Sprite={getPokemonSprite(selectedPokemon1)}
+          pokemon2Sprite={getPokemonSprite(selectedPokemon2)}
+          subtitle="Friendly Battle"
+          onComplete={handleIntroComplete}
+        />
+      );
+    }
+
     return (
       <PokemonSelection
         onPokemonSelected={handlePokemonSelected}

@@ -15,6 +15,7 @@ import { EffectivenessIndicator } from "@/components/battle/EffectivenessIndicat
 import { TypeParticles } from "@/components/battle/TypeParticles";
 import { BattleSummaryScreen } from "@/components/battle/BattleSummaryScreen";
 import { BattleStatsDisplay } from "@/components/battle/BattleStatsDisplay";
+import { BattleIntro } from "@/components/battle/BattleIntro";
 import { calculateMoveEffectiveness, type Effectiveness } from "@/lib/utils/battleHelpers";
 import { useBattleStats } from "@/hooks/useBattleStats";
 import { getAllEliteFourConfigs } from "@/data/eliteFour";
@@ -76,12 +77,15 @@ export function EliteFourArena() {
   const [pokemon1TakingDamage, setPokemon1TakingDamage] = useState(false);
   const [pokemon2TakingDamage, setPokemon2TakingDamage] = useState(false);
   const [effectiveness, setEffectiveness] = useState<Effectiveness | null>(null);
+  const [showIntro, setShowIntro] = useState(false);
   
   const previousLogLengthRef = useRef(0);
   const currentTurnMoveTypesRef = useRef<{ move1Type: string | null; move2Type: string | null }>({
     move1Type: null,
     move2Type: null,
   });
+  // Track if we've already shown the intro for this matchup (per opponent)
+  const introShownForMatchupRef = useRef<string | null>(null);
 
   const {
     battleState,
@@ -110,6 +114,7 @@ export function EliteFourArena() {
   useEffect(() => {
     if (battleState && battleState.log.length > 0) {
       if (battleState.log[0]?.type === "battle_start") {
+        // First event is always battle_start for a new battle
         previousLogLengthRef.current = 1;
       }
     }
@@ -416,6 +421,11 @@ export function EliteFourArena() {
   useEffect(() => {
     if (status === "battling" && stableOpponentIndex !== null) {
       const matchupKey = `${stableOpponentIndex}`;
+      // Show intro once per matchup (per opponent)
+      if (introShownForMatchupRef.current !== matchupKey) {
+        introShownForMatchupRef.current = matchupKey;
+        setShowIntro(true);
+      }
       // If we're starting a new matchup (different opponent), reset summary tracking
       // BUT only after the summary has been shown (don't reset while waiting to show summary)
       // Also check if we have preserved data waiting to be shown for a different matchup
@@ -777,6 +787,21 @@ export function EliteFourArena() {
   return (
     <>
       {mainContent}
+      {/* Battle Intro overlay for each new round */}
+      {showIntro && status === "battling" && (
+        <BattleIntro
+          pokemon1Name={userPokemon?.name ?? "You"}
+          pokemon2Name={currentOpponent?.name ?? "Opponent"}
+          pokemon1Sprite={pokemon1Sprite}
+          pokemon2Sprite={pokemon2Sprite}
+          subtitle={currentOpponent?.title}
+          roundLabel="Best of 3"
+          onComplete={() => {
+            setShowIntro(false);
+            resumeProgression();
+          }}
+        />
+      )}
       {/* Render summary screen at component level so it persists even when status changes */}
       {showSummary && preservedBattleState && preservedPokemon1 && preservedPokemon2 && (
         <BattleSummaryScreen
