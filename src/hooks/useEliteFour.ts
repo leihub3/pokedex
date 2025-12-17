@@ -32,6 +32,8 @@ export interface UseEliteFourReturn {
   onBattleWin: () => void;
   onBattleLoss: () => void;
   resetRun: () => void;
+  pauseProgression: () => void;
+  resumeProgression: () => void;
   
   // Getters
   isChampionBattle: () => boolean;
@@ -74,6 +76,10 @@ export function useEliteFour(): UseEliteFourReturn {
   const isStartingBattleRef = useRef<boolean>(false);
   // Track auto-advance timeout for Master Mode
   const masterModeAutoAdvanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Track if progression should be paused (e.g., when summary screen is showing)
+  const isPausedRef = useRef<boolean>(false);
+  // Track pending advancement when matchup completes but progression is paused
+  const pendingAdvancementRef = useRef<(() => void) | null>(null);
   
   /**
    * Get current opponent (member or champion)
@@ -315,6 +321,42 @@ export function useEliteFour(): UseEliteFourReturn {
           }
         } else {
           // Not the champion yet - continue to next opponent
+          // BUT check if progression is paused - if so, defer advancement until resume
+          if (isPausedRef.current) {
+            console.log("→ Matchup won but progression paused - deferring advancement");
+            // Store the advancement logic to execute when progression resumes
+            pendingAdvancementRef.current = () => {
+              console.log(`→ Matchup won! Moving to next opponent. Current index: ${currentOpponentIndex}, Next index: ${currentOpponentIndex + 1}`);
+              
+              // Reset round state for new opponent
+              resetRoundState();
+              
+              // Reset opponent Pokemon to trigger useEffect for next battle
+              setOpponentPokemon(null);
+              
+              // Advance to next opponent (useEffect will start next battle)
+              const nextIndex = currentOpponentIndex + 1;
+              
+              setCurrentOpponentIndex((prevIndex) => {
+                if (prevIndex !== currentOpponentIndex) {
+                  console.warn(`currentOpponentIndex mismatch: prev=${prevIndex}, current=${currentOpponentIndex}`);
+                }
+                return nextIndex;
+              });
+              
+              setStatus((prevStatus) => {
+                if (prevStatus !== "battling") {
+                  console.warn(`Status was ${prevStatus}, forcing to 'battling'`);
+                }
+                return "battling";
+              });
+              
+              pendingAdvancementRef.current = null;
+            };
+            return newWins;
+          }
+          
+          // Not paused - advance immediately
           console.log(`→ Matchup won! Moving to next opponent. Current index: ${currentOpponentIndex}, Next index: ${currentOpponentIndex + 1}`);
           
           // Reset round state for new opponent
@@ -371,6 +413,18 @@ export function useEliteFour(): UseEliteFourReturn {
       // Check if opponent won the matchup (2 wins)
       if (newWins.opponent === 2) {
         // Lost the matchup - end the run
+        // Champion loss always ends challenge, no pause needed
+        // For Elite Four members, we want to show summary first
+        if (isPausedRef.current) {
+          // Store the defeat logic to execute when progression resumes
+          pendingAdvancementRef.current = () => {
+            console.log("✗ Matchup lost! Ending challenge.");
+            setStatus("defeated");
+            pendingAdvancementRef.current = null;
+          };
+          return newWins;
+        }
+        
         console.log("✗ Matchup lost! Ending challenge.");
         setStatus("defeated");
       } else {
@@ -548,22 +602,56 @@ export function useEliteFour(): UseEliteFourReturn {
       status
     });
     
-    // Mark this battle as processed
+    // Mark this battle as processed immediately to prevent duplicate processing
     battleProcessedRef.current = battleKey;
     lastProcessedOpponentIndexRef.current = currentOpponentIndex;
     
-    // User is always pokemon1 (index 0)
-    if (winnerIndex === 0) {
-      // User won
-      console.log("User won the battle, calling onBattleWin");
-      onBattleWin();
-    } else {
-      // User lost
-      console.log("User lost the battle, calling onBattleLoss");
-      onBattleLoss();
+    // Delay battle result processing to allow animations and summary screen
+    // Check if this battle will complete the matchup BEFORE calling onBattleWin
+    // If it will, pause progression so EliteFourArena can show summary first
+    const willCompleteMatchup = (winnerIndex === 0 && roundWins.user === 1) || // User wins and had 1 win
+                                 (winnerIndex === 1 && roundWins.opponent === 1); // Opponent wins and had 1 win
+    
+    console.log("Battle completion check:", {
+      winnerIndex,
+      currentRoundWins: roundWins,
+      willCompleteMatchup,
+      isPaused: isPausedRef.current,
+    });
+    
+    if (willCompleteMatchup) {
+      console.log("This battle will complete the matchup - pausing progression for summary screen");
+      isPausedRef.current = true; // Pause immediately so onBattleWin won't advance
     }
+    
+    setTimeout(() => {
+      // Check if progression is paused (e.g., summary screen is showing)
+      // If paused, wait and check again
+      const checkAndProcess = () => {
+        if (isPausedRef.current) {
+          // Still paused, check again in 100ms
+          console.log("Battle progression paused, waiting for resume...");
+          setTimeout(checkAndProcess, 100);
+          return;
+        }
+        
+        // Not paused, proceed with battle result processing
+        // User is always pokemon1 (index 0)
+        if (winnerIndex === 0) {
+          // User won
+          console.log("User won the battle, calling onBattleWin");
+          onBattleWin();
+        } else {
+          // User lost
+          console.log("User lost the battle, calling onBattleLoss");
+          onBattleLoss();
+        }
+      };
+      
+      checkAndProcess();
+    }, 2500); // 2.5 second delay to allow animations
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, battle.battleState, battle.isBattleFinished, battle.getWinner, onBattleWin, onBattleLoss, currentOpponentIndex, currentRound, opponentPokemon?.id]);
+  }, [status, battle.battleState, battle.isBattleFinished, battle.getWinner, onBattleWin, onBattleLoss, currentOpponentIndex, currentRound, opponentPokemon?.id, roundWins.user, roundWins.opponent]);
   
   // Reset round state when opponent index changes (new opponent matchup)
   useEffect(() => {
@@ -684,6 +772,28 @@ export function useEliteFour(): UseEliteFourReturn {
     }
   }, [status, currentOpponentIndex, userPokemon, config, opponentPokemon, roundWins, currentRound, battle.battle, battle.isLoading, battle.isBattleFinished, startNextBattle, getCurrentOpponent]);
   
+  /**
+   * Pause battle progression (e.g., when summary screen is showing)
+   */
+  const pauseProgression = useCallback(() => {
+    isPausedRef.current = true;
+    console.log("Battle progression paused");
+  }, []);
+
+  /**
+   * Resume battle progression (e.g., when summary screen is closed)
+   */
+  const resumeProgression = useCallback(() => {
+    isPausedRef.current = false;
+    console.log("Battle progression resumed");
+    
+    // If there's pending advancement (matchup completed while paused), execute it now
+    if (pendingAdvancementRef.current) {
+      console.log("Executing pending advancement");
+      pendingAdvancementRef.current();
+    }
+  }, []);
+
   return {
     status,
     currentOpponentIndex,
@@ -700,6 +810,8 @@ export function useEliteFour(): UseEliteFourReturn {
     onBattleWin,
     onBattleLoss,
     resetRun,
+    pauseProgression,
+    resumeProgression,
     isChampionBattle,
     getCurrentOpponentTitle,
   };

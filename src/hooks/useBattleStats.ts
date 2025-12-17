@@ -6,6 +6,7 @@ import type { Effectiveness } from "@/lib/utils/battleHelpers";
 
 export interface BattleStats {
   totalTurns: number;
+  lastTurnComplete: boolean; // Whether the last turn had both Pokémon act (has turn_end event)
   damageDealt: { pokemon0: number; pokemon1: number };
   damageReceived: { pokemon0: number; pokemon1: number };
   movesUsed: Map<string, { count: number; pokemonIndex: number }>;
@@ -34,6 +35,7 @@ export function useBattleStats({
 }: UseBattleStatsOptions) {
   const [stats, setStats] = useState<BattleStats>({
     totalTurns: 0,
+    lastTurnComplete: true,
     damageDealt: { pokemon0: 0, pokemon1: 0 },
     damageReceived: { pokemon0: 0, pokemon1: 0 },
     movesUsed: new Map(),
@@ -85,6 +87,7 @@ export function useBattleStats({
       // Reset stats when battle state is cleared
       setStats({
         totalTurns: 0,
+        lastTurnComplete: true,
         damageDealt: { pokemon0: 0, pokemon1: 0 },
         damageReceived: { pokemon0: 0, pokemon1: 0 },
         movesUsed: new Map(),
@@ -115,15 +118,22 @@ export function useBattleStats({
 
         switch (event.type) {
           case "battle_start":
-            newStats.startTime = Date.now();
-            newStats.totalTurns = 0;
-            // Track initial HP
-            trackHPHistory(0);
-            break;
+        newStats.startTime = Date.now();
+        newStats.totalTurns = 0;
+        newStats.lastTurnComplete = true;
+        // Track initial HP
+        trackHPHistory(0);
+        break;
 
           case "turn_start":
             newStats.totalTurns = event.turnNumber;
+            newStats.lastTurnComplete = false; // Assume incomplete until turn_end
             trackHPHistory(event.turnNumber);
+            break;
+
+          case "turn_end":
+            // Turn completed - both Pokémon acted
+            newStats.lastTurnComplete = true;
             break;
 
           case "move_used":
@@ -201,6 +211,8 @@ export function useBattleStats({
             newStats.endTime = Date.now();
             newStats.battleDuration = newStats.endTime - newStats.startTime;
             trackHPHistory(newStats.totalTurns);
+            // If faint happens, the turn may not have completed (no turn_end event)
+            // lastTurnComplete will remain false if the battle ended early
             break;
         }
 
@@ -274,6 +286,7 @@ export function useBattleStats({
     reset: useCallback(() => {
       setStats({
         totalTurns: 0,
+        lastTurnComplete: true,
         damageDealt: { pokemon0: 0, pokemon1: 0 },
         damageReceived: { pokemon0: 0, pokemon1: 0 },
         movesUsed: new Map(),

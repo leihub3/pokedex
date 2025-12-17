@@ -37,6 +37,8 @@ export function EliteFourArena() {
     battle,
     startRun,
     resetRun,
+    pauseProgression,
+    resumeProgression,
   } = eliteFour;
 
   const [animationSpeed, setAnimationSpeed] = useState<AnimationSpeed>(1);
@@ -231,19 +233,181 @@ export function EliteFourArena() {
     }
   }, [config, status]);
 
-  // Show summary when battle finishes (MUST be before early returns)
+  // Track if we've shown summary for each matchup to prevent duplicate processing
+  // Use matchup key: `${opponentIndex}` to track matchups (not individual battles)
+  const summaryShownForMatchupRef = useRef<string | null>(null);
+  const preservedMatchupKeyRef = useRef<string | null>(null); // Store the matchup key when preserving data
+  const hasPreservedDataRef = useRef<boolean>(false); // Track if preserved data exists (for stable dependency checks)
+  
+  // Prepare summary screen data - preserve it when summary is showing
+  const [preservedBattleState, setPreservedBattleState] = useState<typeof battle.battleState>(null);
+  const [preservedPokemon1, setPreservedPokemon1] = useState<ReturnType<typeof getActivePokemon> | null>(null);
+  const [preservedPokemon2, setPreservedPokemon2] = useState<ReturnType<typeof getActivePokemon> | null>(null);
+  const [preservedWinner, setPreservedWinner] = useState<ReturnType<typeof battle.getWinner> | null>(null);
+  const [preservedSprites, setPreservedSprites] = useState<{ pokemon1: string | null; pokemon2: string | null }>({ pokemon1: null, pokemon2: null });
+  
+  // Check if battle is finished
   const finished = battleState ? isBattleFinished() : false;
+  const winner = finished ? getWinner() : null;
+  
+  // Check if matchup is complete (after battle result processing has updated roundWins)
+  // Matchup completes when one side wins 2 rounds (2-0 or 2-1)
+  const matchupComplete = roundWins.user === 2 || roundWins.opponent === 2;
+  
+  // Check if this battle would complete the matchup (for early detection before roundWins updates)
+  // If user wins and already has 1 win, this would be the 2nd win (matchup complete)
+  // If opponent wins and already has 1 win, this would be the 2nd win (matchup complete)
+  const willCompleteMatchup = finished && winner !== null && (
+    (winner === 0 && roundWins.user === 1) || // User wins and had 1 win already
+    (winner === 1 && roundWins.opponent === 1) // Opponent wins and had 1 win already
+  );
+  
+  // Preserve battle data early when we detect this battle will complete the matchup
   useEffect(() => {
-    if (finished && !showSummary && battleState && status === "battling") {
-      // Small delay to let faint animation play
+    if (finished && willCompleteMatchup && battleState && !showSummary && currentOpponentIndex !== null) {
+      const matchupKey = `${currentOpponentIndex}`;
+      
+      // Don't preserve if we already showed summary for this matchup
+      if (summaryShownForMatchupRef.current === matchupKey) {
+        return;
+      }
+      
+      // Preserve battle data immediately before state might change
+      const pokemon1 = getActivePokemon(0);
+      const pokemon2 = getActivePokemon(1);
+      const battleWinner = getWinner();
+      
+      if (pokemon1 && pokemon2) {
+        console.log("[Summary Debug] Matchup will complete, preserving data for summary", {
+          matchupKey,
+          pokemon1: pokemon1.pokemon.name,
+          pokemon2: pokemon2.pokemon.name,
+          winner: battleWinner,
+          roundWins,
+          currentRound,
+        });
+        
+        // Store the matchup key for this preserved data
+        preservedMatchupKeyRef.current = matchupKey;
+        hasPreservedDataRef.current = true;
+        
+        setPreservedBattleState(battleState);
+        setPreservedPokemon1(pokemon1);
+        setPreservedPokemon2(pokemon2);
+        setPreservedWinner(battleWinner);
+        setPreservedSprites({
+          pokemon1: battle.pokemon1Sprite,
+          pokemon2: battle.pokemon2Sprite,
+        });
+      }
+    }
+  }, [finished, willCompleteMatchup, battleState, showSummary, currentOpponentIndex, roundWins, currentRound, getActivePokemon, getWinner, battle.pokemon1Sprite, battle.pokemon2Sprite]);
+
+  // Show summary when matchup is actually complete (roundWins === 2) or will complete (willCompleteMatchup)
+  // We check willCompleteMatchup because progression is paused before roundWins updates
+  // Use stable references for dependencies to avoid array size changes
+  const stableMatchupComplete = matchupComplete ?? false;
+  const stableWillCompleteMatchup = willCompleteMatchup ?? false;
+  const stableCurrentOpponentIndex = currentOpponentIndex ?? null;
+  
+  useEffect(() => {
+    // Show summary if matchup will complete (and we have preserved data)
+    // OR if matchup is already complete (roundWins === 2)
+    const shouldShowSummary = (stableMatchupComplete || stableWillCompleteMatchup) && 
+                              !showSummary && 
+                              preservedBattleState && 
+                              preservedPokemon1 && 
+                              preservedPokemon2;
+    
+    console.log("[Summary Debug] Summary effect check:", {
+      stableMatchupComplete,
+      stableWillCompleteMatchup,
+      showSummary,
+      hasPreservedData: !!(preservedBattleState && preservedPokemon1 && preservedPokemon2),
+      preservedMatchupKey: preservedMatchupKeyRef.current,
+      roundWins,
+      finished,
+      winner,
+    });
+    
+    if (shouldShowSummary) {
+      const matchupKey = preservedMatchupKeyRef.current;
+      
+      if (!matchupKey) {
+        console.log("[Summary Debug] No preserved matchup key found, skipping");
+        return;
+      }
+      
+      // Only show summary once per matchup
+      if (summaryShownForMatchupRef.current === matchupKey) {
+        console.log("[Summary Debug] Summary already shown for this matchup, skipping", { matchupKey });
+        return;
+      }
+      
+      console.log("[Summary Debug] ✓ Matchup complete! Showing summary screen and pausing progression", {
+        matchupKey,
+        roundWins,
+        willCompleteMatchup: stableWillCompleteMatchup,
+        matchupComplete: stableMatchupComplete,
+        currentOpponentIndex: stableCurrentOpponentIndex,
+        preservedMatchupKey: preservedMatchupKeyRef.current,
+      });
+      
+      // Pause progression before showing summary (if not already paused)
+      pauseProgression();
+      
+      // Show summary after a brief delay to let animations settle
       const timer = setTimeout(() => {
+        console.log("[Summary Debug] Setting showSummary=true", { matchupKey });
+        summaryShownForMatchupRef.current = matchupKey;
         setShowSummary(true);
-      }, 1500);
+      }, 500); // Short delay after matchup completes
       return () => clearTimeout(timer);
     }
-  }, [finished, showSummary, battleState, status, isBattleFinished]);
-
+  }, [stableMatchupComplete, stableWillCompleteMatchup, showSummary, preservedBattleState, preservedPokemon1, preservedPokemon2, stableCurrentOpponentIndex, roundWins, pauseProgression]);
+  
+  // Reset summary tracking when starting a new matchup (opponent changes)
+  // Use a stable reference for currentOpponentIndex to avoid dependency array size changes
+  const stableOpponentIndex = currentOpponentIndex ?? null;
+  
+  useEffect(() => {
+    if (status === "battling" && stableOpponentIndex !== null) {
+      const matchupKey = `${stableOpponentIndex}`;
+      // If we're starting a new matchup (different opponent), reset summary tracking
+      // BUT only after the summary has been shown (don't reset while waiting to show summary)
+      // Also check if we have preserved data waiting to be shown for a different matchup
+      const hasPendingSummary = preservedMatchupKeyRef.current !== null && 
+                                preservedMatchupKeyRef.current !== matchupKey &&
+                                hasPreservedDataRef.current;
+      
+      if (summaryShownForMatchupRef.current !== matchupKey && !showSummary && !hasPendingSummary) {
+        console.log("[Summary Debug] New matchup detected, resetting summary tracking", {
+          oldMatchupKey: summaryShownForMatchupRef.current,
+          newMatchupKey: matchupKey,
+          preservedMatchupKey: preservedMatchupKeyRef.current,
+        });
+        summaryShownForMatchupRef.current = null;
+        preservedMatchupKeyRef.current = null;
+        hasPreservedDataRef.current = false;
+        setShowSummary(false);
+        // Clear preserved data only if we're not showing the summary and no summary is pending
+        setPreservedBattleState(null);
+        setPreservedPokemon1(null);
+        setPreservedPokemon2(null);
+        setPreservedWinner(null);
+        setPreservedSprites({ pokemon1: null, pokemon2: null });
+      } else if (hasPendingSummary) {
+        console.log("[Summary Debug] Preserved summary data exists for different matchup, not resetting", {
+          currentMatchupKey: matchupKey,
+          preservedMatchupKey: preservedMatchupKeyRef.current,
+        });
+      }
+    }
+  }, [status, stableOpponentIndex, showSummary]);
+  
   // Render based on status
+  let mainContent;
+  
   if (status === "lobby") {
     const availableRegions = getAllEliteFourConfigs();
     const defaultConfig = config || availableRegions[0];
@@ -256,17 +420,15 @@ export function EliteFourArena() {
       startRun(userPokemon, selectedConfig, selectedMoves);
     };
     
-    return (
+    mainContent = (
       <EliteFourLobby
         config={defaultConfig}
         onStart={handleStart}
         isStarting={isLoading}
       />
     );
-  }
-
-  if (status === "victory" && userPokemon && config) {
-    return (
+  } else if (status === "victory" && userPokemon && config) {
+    mainContent = (
       <EliteFourVictory
         config={config}
         userPokemon={userPokemon}
@@ -274,10 +436,8 @@ export function EliteFourArena() {
         onContinueCareer={resetRun} // For now, same as restart - will implement actual continuation later
       />
     );
-  }
-
-  if (status === "defeated" && userPokemon && config) {
-    return (
+  } else if (status === "defeated" && userPokemon && config) {
+    mainContent = (
       <EliteFourDefeat
         config={config}
         userPokemon={userPokemon}
@@ -299,7 +459,7 @@ export function EliteFourArena() {
     const isMasterMode = gameMode === "master";
     const masterModeProgress = isMasterMode ? getMasterModeProgress() : null;
 
-    return (
+    mainContent = (
       <div className="space-y-6">
         {/* Master Mode Progress Indicator */}
         {isMasterMode && masterModeProgress && config && (
@@ -547,21 +707,40 @@ export function EliteFourArena() {
           />
         )}
 
-        {/* Battle Summary Screen */}
-        {showSummary && finished && (
-          <BattleSummaryScreen
-            stats={battleStats.stats}
-            winner={winner}
-            pokemon1={pokemon1}
-            pokemon2={pokemon2}
-            pokemon1Sprite={pokemon1Sprite}
-            pokemon2Sprite={pokemon2Sprite}
-            onClose={() => setShowSummary(false)}
-          />
-        )}
       </div>
     );
   }
+  
+  // Render main content and summary screen together
+  return (
+    <>
+      {mainContent}
+      {/* Render summary screen at component level so it persists even when status changes */}
+      {showSummary && preservedBattleState && preservedPokemon1 && preservedPokemon2 && (
+        <BattleSummaryScreen
+          stats={battleStats.stats}
+          winner={preservedWinner}
+          pokemon1={preservedPokemon1}
+          pokemon2={preservedPokemon2}
+          pokemon1Sprite={preservedSprites.pokemon1}
+          pokemon2Sprite={preservedSprites.pokemon2}
+          onClose={() => {
+            setShowSummary(false);
+            // Resume progression when summary is closed
+            resumeProgression();
+            // Clear preserved data after summary is closed
+            preservedMatchupKeyRef.current = null;
+            hasPreservedDataRef.current = false;
+            setPreservedBattleState(null);
+            setPreservedPokemon1(null);
+            setPreservedPokemon2(null);
+            setPreservedWinner(null);
+            setPreservedSprites({ pokemon1: null, pokemon2: null });
+          }}
+        />
+      )}
+    </>
+  );
 
   // Loading state - show when status is battling but battleState is not ready
   if (status === "battling") {

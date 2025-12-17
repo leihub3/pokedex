@@ -21,6 +21,7 @@ interface PokemonPanelProps {
   onAttackComplete?: () => void;
   isTakingDamage?: boolean;
   damageAmount?: number; // Damage amount for display
+  isCriticalHit?: boolean; // Whether the damage is from a critical hit
   onDamageComplete?: () => void;
   speedMultiplier?: number;
   previousHP?: number; // Previous HP for HP bar animation
@@ -36,12 +37,14 @@ export function PokemonPanel({
   onAttackComplete,
   isTakingDamage = false,
   damageAmount = 0,
+  isCriticalHit = false,
   onDamageComplete,
   speedMultiplier = 1,
   previousHP,
 }: PokemonPanelProps) {
   const { pokemon, currentHP, maxHP, status, statStages } = activePokemon;
   const isFainted = currentHP <= 0;
+  const isLowHP = (currentHP / maxHP) < 0.25; // Less than 25% HP
   const containerRef = useRef<HTMLDivElement>(null);
   const hpBarRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
@@ -122,17 +125,80 @@ export function PokemonPanel({
       }}
       className={`relative flex flex-col h-full rounded-xl border-2 border-gray-200 bg-white p-6 shadow-lg transition-all dark:border-gray-700 dark:bg-gray-800 ${
         isFainted ? "grayscale" : ""
-      }`}
+      } ${isLowHP && !isFainted ? "border-red-500" : ""}`}
       style={{
         boxShadow: isFainted
           ? "0 4px 6px rgba(0, 0, 0, 0.1)"
+          : isLowHP
+          ? "0 10px 25px rgba(0, 0, 0, 0.15), 0 0 20px rgba(239, 68, 68, 0.6), 0 0 30px rgba(239, 68, 68, 0.4)"
           : "0 10px 25px rgba(0, 0, 0, 0.15), 0 0 15px rgba(59, 130, 246, 0.1)",
       }}
     >
+      {/* Low HP Warning - Red pulsing border */}
+      {isLowHP && !isFainted && !prefersReducedMotion && (
+        <motion.div
+          className="absolute inset-0 rounded-xl pointer-events-none"
+          animate={{
+            boxShadow: [
+              "0 0 0px rgba(239, 68, 68, 0)",
+              "0 0 15px rgba(239, 68, 68, 0.8)",
+              "0 0 0px rgba(239, 68, 68, 0)",
+            ],
+          }}
+          transition={{
+            duration: 1,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          style={{
+            border: "2px solid rgba(239, 68, 68, 0.8)",
+          }}
+        />
+      )}
+      
+      {/* Critical Hit Effect - Golden flash overlay */}
+      {isCriticalHit && !prefersReducedMotion && (
+        <motion.div
+          className="absolute inset-0 rounded-xl pointer-events-none z-10"
+          initial={{ opacity: 0 }}
+          animate={{
+            opacity: [0, 0.9, 0.7, 0.4, 0],
+            backgroundColor: [
+              "rgba(250, 204, 21, 0)",
+              "rgba(250, 204, 21, 0.9)",
+              "rgba(234, 179, 8, 0.7)",
+              "rgba(234, 179, 8, 0.4)",
+              "rgba(250, 204, 21, 0)",
+            ],
+          }}
+          transition={{
+            duration: 0.6 / speedMultiplier,
+            times: [0, 0.2, 0.4, 0.7, 1],
+            ease: "easeOut",
+          }}
+        />
+      )}
       {/* Type Particles for Attack - rendered in BattleArena due to positioning */}
 
       {/* Pokemon Sprite */}
-      <div className="mb-4 flex justify-center">
+      <div className="mb-4 flex justify-center relative">
+        {/* Low HP Warning Icon */}
+        {isLowHP && !isFainted && (
+          <motion.div
+            className="absolute -top-2 -right-2 z-20"
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: [1, 1.2, 1], rotate: 0 }}
+            transition={{
+              scale: {
+                duration: 0.5,
+                repeat: Infinity,
+                repeatType: "reverse",
+              },
+            }}
+          >
+            <span className="text-3xl">⚠️</span>
+          </motion.div>
+        )}
         {spriteUrl ? (
           <motion.div
             animate={
@@ -148,6 +214,26 @@ export function PokemonPanel({
                 ? {
                     x: position === "left" ? [0, 30, 0] : [0, -30, 0],
                     scale: [1, 1.1, 1],
+                  }
+                : isTakingDamage && isCriticalHit && !isFainted && !prefersReducedMotion
+                ? {
+                    // Critical hit: zoom animation and enhanced shake
+                    scale: [1, 1.3, 1.1, 1],
+                    x: [
+                      Math.random() * 12 - 6,
+                      Math.random() * 12 - 6,
+                      Math.random() * 12 - 6,
+                      Math.random() * 12 - 6,
+                      0,
+                    ],
+                    y: [
+                      Math.random() * 12 - 6,
+                      Math.random() * 12 - 6,
+                      Math.random() * 12 - 6,
+                      Math.random() * 12 - 6,
+                      0,
+                    ],
+                    rotate: [0, -5, 5, -5, 0],
                   }
                 : isTakingDamage && !isFainted && !prefersReducedMotion
                 ? {
@@ -167,6 +253,11 @@ export function PokemonPanel({
                       0,
                     ],
                   }
+                : isLowHP && !isFainted && !prefersReducedMotion
+                ? {
+                    // Low HP pulse effect on sprite
+                    scale: [1, 1.05, 1],
+                  }
                 : isAnimating && !isFainted && !isAttacking && !isTakingDamage
                 ? { x: [-5, 5, -5, 5, 0] }
                 : {}
@@ -176,11 +267,21 @@ export function PokemonPanel({
                 ? 0
                 : isFainted
                 ? 1200 / speedMultiplier / 1000 // 1200ms faint animation
+                : isTakingDamage && isCriticalHit
+                ? 600 / speedMultiplier / 1000 // Longer for critical hits (600ms with slow-motion effect)
                 : isTakingDamage
                 ? 300 / speedMultiplier / 1000 // Increased from 200ms to 300ms
+                : isLowHP
+                ? 1 / speedMultiplier // 1 second pulse for low HP
                 : 300 / speedMultiplier / 1000,
-              ease: isFainted ? "easeInOut" : "easeOut",
-              times: isFainted ? [0, 0.2, 0.5, 0.8, 1] : undefined,
+              ease: isFainted ? "easeInOut" : isLowHP ? "easeInOut" : "easeOut",
+              times: isFainted
+                ? [0, 0.2, 0.5, 0.8, 1]
+                : isTakingDamage && isCriticalHit
+                ? [0, 0.15, 0.4, 0.7, 1]
+                : undefined,
+              repeat: isLowHP ? Infinity : undefined,
+              repeatType: isLowHP ? "reverse" : undefined,
             }}
             className="relative h-48 w-48"
             style={{
@@ -205,7 +306,19 @@ export function PokemonPanel({
                         "rgba(0,0,0,0.9)",
                       ],
                     }
-                  : isTakingDamage && !prefersReducedMotion
+                  : isTakingDamage && isCriticalHit && !prefersReducedMotion
+                  ? {
+                      // Critical hit: yellow/gold flash
+                      opacity: [1, 0.3, 1, 0.5, 1],
+                      backgroundColor: [
+                        "transparent",
+                        "rgba(250, 204, 21, 0.9)",
+                        "rgba(234, 179, 8, 0.8)",
+                        "rgba(250, 204, 21, 0.6)",
+                        "transparent",
+                      ],
+                    }
+                : isTakingDamage && !prefersReducedMotion
                   ? {
                       // Longer flash: 300ms duration
                       opacity: [1, 0.2, 1, 0.3, 1],
@@ -216,9 +329,13 @@ export function PokemonPanel({
               transition={{
                 duration: isFainted
                   ? 1200 / speedMultiplier / 1000
+                  : isTakingDamage && isCriticalHit
+                  ? 600 / speedMultiplier / 1000
                   : 300 / speedMultiplier / 1000,
                 times: isFainted 
                   ? [0, 0.15, 0.3, 0.7, 1] 
+                  : isTakingDamage && isCriticalHit
+                  ? [0, 0.1, 0.3, 0.6, 1]
                   : isTakingDamage 
                   ? [0, 0.2, 0.4, 0.6, 0.8, 1] 
                   : [0, 0.25, 0.5, 0.75, 1],
@@ -278,6 +395,7 @@ export function PokemonPanel({
           {showDamageNumber && damageNumberPosition && damageAmount > 0 && (
             <DamageNumber
               damage={damageAmount}
+              isCritical={isCriticalHit}
               position={damageNumberPosition}
               onComplete={() => setShowDamageNumber(false)}
             />
