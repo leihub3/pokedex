@@ -9,7 +9,9 @@ import { BattleLog } from "./BattleLog";
 import { BattleControls } from "./BattleControls";
 import { EffectivenessIndicator } from "./EffectivenessIndicator";
 import { TypeParticles } from "./TypeParticles";
+import { BattleSummaryScreen } from "./BattleSummaryScreen";
 import { calculateMoveEffectiveness, type Effectiveness } from "@/lib/utils/battleHelpers";
+import { useBattleStats } from "@/hooks/useBattleStats";
 import type { Pokemon as APIPokemon } from "@/types/api";
 import type { AnimationSpeed } from "@/hooks/useBattleAnimation";
 import type { BattleEvent } from "@/battle-engine";
@@ -40,10 +42,24 @@ export function BattleArena() {
   const [selectedPokemon2, setSelectedPokemon2] =
     useState<APIPokemon | null>(null);
   const [animationSpeed, setAnimationSpeed] = useState<AnimationSpeed>(1);
+  const [showSummary, setShowSummary] = useState(false);
+  const [pokemon1DamageAmount, setPokemon1DamageAmount] = useState(0);
+  const [pokemon2DamageAmount, setPokemon2DamageAmount] = useState(0);
+  const [pokemon1PreviousHP, setPokemon1PreviousHP] = useState<number | undefined>(undefined);
+  const [pokemon2PreviousHP, setPokemon2PreviousHP] = useState<number | undefined>(undefined);
   
   // Battle view container dimensions for particle positioning
   const battleViewRef = useRef<HTMLDivElement>(null);
   const [battleViewDimensions, setBattleViewDimensions] = useState({ width: 1200, height: 400 });
+
+  // Battle statistics tracking
+  const battleStats = useBattleStats({
+    battleState,
+    getActivePokemon,
+    pokemon1Moves,
+    pokemon2Moves,
+    calculateEffectiveness: calculateMoveEffectiveness,
+  });
 
   // Measure actual battle view container dimensions
   useEffect(() => {
@@ -118,8 +134,10 @@ export function BattleArena() {
           }
         }
       } else if (event.type === "damage_dealt") {
-        // Trigger damage animation
+        // Trigger damage animation and track damage amounts
         if (event.pokemonIndex === 0) {
+          setPokemon1PreviousHP(currentPokemon1?.currentHP);
+          setPokemon1DamageAmount(event.damage);
           setPokemon1TakingDamage(true);
           // Calculate effectiveness for damage to pokemon1 (defender)
           // The attacker is pokemon2, so use pokemon2's move type
@@ -131,6 +149,8 @@ export function BattleArena() {
             setEffectiveness(eff);
           }
         } else {
+          setPokemon2PreviousHP(currentPokemon2?.currentHP);
+          setPokemon2DamageAmount(event.damage);
           setPokemon2TakingDamage(true);
           // Calculate effectiveness for damage to pokemon2 (defender)
           // The attacker is pokemon1, so use pokemon1's move type
@@ -198,8 +218,10 @@ export function BattleArena() {
 
   const handleReset = () => {
     resetBattle();
+    battleStats.reset();
     setSelectedPokemon1(null);
     setSelectedPokemon2(null);
+    setShowSummary(false);
     // Reset animation states
     setPokemon1Attacking(false);
     setPokemon2Attacking(false);
@@ -208,9 +230,25 @@ export function BattleArena() {
     setPokemon1TakingDamage(false);
     setPokemon2TakingDamage(false);
     setEffectiveness(null);
+    setPokemon1DamageAmount(0);
+    setPokemon2DamageAmount(0);
+    setPokemon1PreviousHP(undefined);
+    setPokemon2PreviousHP(undefined);
     previousLogLengthRef.current = 0;
     currentTurnMoveTypesRef.current = { move1Type: null, move2Type: null };
   };
+
+  // Show summary when battle finishes
+  const finished = isBattleFinished();
+  useEffect(() => {
+    if (finished && !showSummary && battleState) {
+      // Small delay to let faint animation play
+      const timer = setTimeout(() => {
+        setShowSummary(true);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [finished, showSummary, battleState]);
 
   // Reset effectiveness after display
   useEffect(() => {
@@ -234,7 +272,6 @@ export function BattleArena() {
 
   const pokemon1 = getActivePokemon(0);
   const pokemon2 = getActivePokemon(1);
-  const finished = isBattleFinished();
   const winner = getWinner();
 
   return (
@@ -284,11 +321,15 @@ export function BattleArena() {
                 setPokemon1Attacking(false);
                 setPokemon1AttackType(null);
               }}
-              isTakingDamage={pokemon1TakingDamage}
-              onDamageComplete={() => {
-                setPokemon1TakingDamage(false);
-              }}
-              speedMultiplier={animationSpeed}
+                  isTakingDamage={pokemon1TakingDamage}
+                  damageAmount={pokemon1DamageAmount}
+                  previousHP={pokemon1PreviousHP}
+                  onDamageComplete={() => {
+                    setPokemon1TakingDamage(false);
+                    setPokemon1DamageAmount(0);
+                    setPokemon1PreviousHP(undefined);
+                  }}
+                  speedMultiplier={animationSpeed}
             />
           )}
         </div>
@@ -354,11 +395,15 @@ export function BattleArena() {
                 setPokemon2Attacking(false);
                 setPokemon2AttackType(null);
               }}
-              isTakingDamage={pokemon2TakingDamage}
-              onDamageComplete={() => {
-                setPokemon2TakingDamage(false);
-              }}
-              speedMultiplier={animationSpeed}
+                  isTakingDamage={pokemon2TakingDamage}
+                  damageAmount={pokemon2DamageAmount}
+                  previousHP={pokemon2PreviousHP}
+                  onDamageComplete={() => {
+                    setPokemon2TakingDamage(false);
+                    setPokemon2DamageAmount(0);
+                    setPokemon2PreviousHP(undefined);
+                  }}
+                  speedMultiplier={animationSpeed}
             />
           )}
         </div>
@@ -370,6 +415,19 @@ export function BattleArena() {
           log={battleState.log}
           pokemon1Name={pokemon1?.pokemon.name ?? "Pokemon 1"}
           pokemon2Name={pokemon2?.pokemon.name ?? "Pokemon 2"}
+        />
+      )}
+
+      {/* Battle Summary Screen */}
+      {showSummary && finished && (
+        <BattleSummaryScreen
+          stats={battleStats.stats}
+          winner={winner}
+          pokemon1={pokemon1}
+          pokemon2={pokemon2}
+          pokemon1Sprite={pokemon1Sprite}
+          pokemon2Sprite={pokemon2Sprite}
+          onClose={() => setShowSummary(false)}
         />
       )}
     </div>

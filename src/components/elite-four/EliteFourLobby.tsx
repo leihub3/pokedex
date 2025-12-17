@@ -59,8 +59,12 @@ export function EliteFourLobby({
   const [selectedRegionId, setSelectedRegionId] = useState<string>(initialRegionId);
 
   // Filter regions based on mode
+  // During SSR, show all regions to avoid hydration mismatch
+  // After mount, filter based on actual unlock status
   const selectableRegions =
-    gameMode === "free"
+    !isMounted
+      ? availableRegions // During SSR, show all regions
+      : gameMode === "free"
       ? availableRegions.filter((r) => isRegionUnlocked(r.id))
       : gameMode === "career"
       ? availableRegions.filter(
@@ -331,19 +335,27 @@ export function EliteFourLobby({
             value={selectedRegionId}
             onChange={(e) => setSelectedRegionId(e.target.value)}
             disabled={gameMode === "career"}
+            suppressHydrationWarning
             className="w-full rounded-lg border border-gray-300 bg-white p-2 text-gray-900 transition-colors hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:hover:border-blue-500"
           >
-            {selectableRegions.map((region) => {
-              // During SSR, assume all regions are unlocked to avoid hydration mismatch
+            {/* Always render all regions during SSR to match initial client render */}
+            {(isMounted ? selectableRegions : availableRegions).map((region) => {
+              // During SSR (when !isMounted), all regions are shown and enabled
+              // After mount, we check actual unlock status
               const isUnlocked = isMounted ? isRegionUnlocked(region.id) : true;
               const isCompleted = isMounted ? careerProgress.completedRegions.includes(region.id) : false;
               const isCurrent = isMounted && gameMode === "career" && careerProgress.currentRegion === region.id;
+              
+              // During SSR, always render as enabled (disabled={false})
+              // This matches the initial client render where all regions are shown
+              const shouldDisable = isMounted ? !isUnlocked : false;
+              
               return (
-                <option key={region.id} value={region.id} disabled={!isUnlocked}>
+                <option key={region.id} value={region.id} disabled={shouldDisable} suppressHydrationWarning>
                   {region.name}
-                  {!isUnlocked && " 🔒"}
-                  {isCompleted && " ✓"}
-                  {isCurrent && " (Current)"}
+                  {isMounted && !isUnlocked && " 🔒"}
+                  {isMounted && isCompleted && " ✓"}
+                  {isMounted && isCurrent && " (Current)"}
                 </option>
               );
             })}

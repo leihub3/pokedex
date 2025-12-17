@@ -8,6 +8,7 @@ import { HPBar } from "./HPBar";
 import { StatusBadge } from "./StatusBadge";
 import { StatStageIndicator } from "./StatStageIndicator";
 import { StatusEffects } from "./StatusEffects";
+import { DamageNumber } from "./DamageNumber";
 import type { ActivePokemon } from "@/battle-engine";
 
 interface PokemonPanelProps {
@@ -19,8 +20,10 @@ interface PokemonPanelProps {
   attackType?: string | null;
   onAttackComplete?: () => void;
   isTakingDamage?: boolean;
+  damageAmount?: number; // Damage amount for display
   onDamageComplete?: () => void;
   speedMultiplier?: number;
+  previousHP?: number; // Previous HP for HP bar animation
 }
 
 export function PokemonPanel({
@@ -32,13 +35,18 @@ export function PokemonPanel({
   attackType = null,
   onAttackComplete,
   isTakingDamage = false,
+  damageAmount = 0,
   onDamageComplete,
   speedMultiplier = 1,
+  previousHP,
 }: PokemonPanelProps) {
   const { pokemon, currentHP, maxHP, status, statStages } = activePokemon;
   const isFainted = currentHP <= 0;
   const containerRef = useRef<HTMLDivElement>(null);
+  const hpBarRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
+  const [damageNumberPosition, setDamageNumberPosition] = useState<{ x: number; y: number } | null>(null);
+  const [showDamageNumber, setShowDamageNumber] = useState(false);
 
   // Get primary type for glow effect
   const primaryType = pokemon.types[0] || "normal";
@@ -68,12 +76,28 @@ export function PokemonPanel({
     }
   }, [isAttacking, speedMultiplier, onAttackComplete]);
 
+  // Calculate damage number position when damage occurs
+  useEffect(() => {
+    if (isTakingDamage && damageAmount > 0 && hpBarRef.current) {
+      const rect = hpBarRef.current.getBoundingClientRect();
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      if (containerRect) {
+        setDamageNumberPosition({
+          x: rect.left + rect.width / 2 - containerRect.left,
+          y: rect.top - containerRect.top,
+        });
+        setShowDamageNumber(true);
+      }
+    }
+  }, [isTakingDamage, damageAmount]);
+
   // Reset damage state after animation
   useEffect(() => {
     if (isTakingDamage) {
       const timer = setTimeout(() => {
+        setShowDamageNumber(false);
         onDamageComplete?.();
-      }, (200 / speedMultiplier) * 2); // Damage flash duration * 2
+      }, (300 / speedMultiplier) * 2); // Damage flash duration * 2 (300ms now)
 
       return () => clearTimeout(timer);
     }
@@ -112,23 +136,34 @@ export function PokemonPanel({
         {spriteUrl ? (
           <motion.div
             animate={
-              isAttacking && !isFainted && !prefersReducedMotion
+              isFainted && !prefersReducedMotion
+                ? {
+                    // Dramatic faint animation: fade, rotate, and slide down
+                    opacity: [1, 1, 0.8, 0.3, 0],
+                    rotate: [0, 5, -5, 10, -90],
+                    y: [0, 0, 10, 30, 80],
+                    scale: [1, 1, 0.95, 0.9, 0.8],
+                  }
+                : isAttacking && !isFainted && !prefersReducedMotion
                 ? {
                     x: position === "left" ? [0, 30, 0] : [0, -30, 0],
                     scale: [1, 1.1, 1],
                   }
                 : isTakingDamage && !isFainted && !prefersReducedMotion
                 ? {
+                    // More pronounced shake: 8-10px
                     x: [
-                      Math.random() * 5 - 2.5,
-                      Math.random() * 5 - 2.5,
-                      Math.random() * 5 - 2.5,
+                      Math.random() * 10 - 5,
+                      Math.random() * 10 - 5,
+                      Math.random() * 10 - 5,
+                      Math.random() * 10 - 5,
                       0,
                     ],
                     y: [
-                      Math.random() * 5 - 2.5,
-                      Math.random() * 5 - 2.5,
-                      Math.random() * 5 - 2.5,
+                      Math.random() * 10 - 5,
+                      Math.random() * 10 - 5,
+                      Math.random() * 10 - 5,
+                      Math.random() * 10 - 5,
                       0,
                     ],
                   }
@@ -139,28 +174,54 @@ export function PokemonPanel({
             transition={{
               duration: prefersReducedMotion
                 ? 0
+                : isFainted
+                ? 1200 / speedMultiplier / 1000 // 1200ms faint animation
                 : isTakingDamage
-                ? 200 / speedMultiplier / 1000
+                ? 300 / speedMultiplier / 1000 // Increased from 200ms to 300ms
                 : 300 / speedMultiplier / 1000,
-              ease: "easeOut",
+              ease: isFainted ? "easeInOut" : "easeOut",
+              times: isFainted ? [0, 0.2, 0.5, 0.8, 1] : undefined,
             }}
             className="relative h-48 w-48"
             style={{
-              filter: isTakingDamage && !prefersReducedMotion ? "brightness(2)" : "none",
+              filter:
+                isFainted && !prefersReducedMotion
+                  ? "grayscale(100%) brightness(0.3)"
+                  : isTakingDamage && !prefersReducedMotion
+                  ? "brightness(2)"
+                  : "none",
             }}
           >
             <motion.div
               animate={
-                isTakingDamage && !prefersReducedMotion
+                isFainted && !prefersReducedMotion
                   ? {
-                      opacity: [1, 0.3, 1, 0.3, 1],
-                      backgroundColor: ["transparent", "rgba(255,255,255,0.8)", "transparent"],
+                      // Red flash before faint
+                      backgroundColor: [
+                        "transparent",
+                        "rgba(255,0,0,0.3)",
+                        "rgba(255,0,0,0.5)",
+                        "rgba(0,0,0,0.7)",
+                        "rgba(0,0,0,0.9)",
+                      ],
+                    }
+                  : isTakingDamage && !prefersReducedMotion
+                  ? {
+                      // Longer flash: 300ms duration
+                      opacity: [1, 0.2, 1, 0.3, 1],
+                      backgroundColor: ["transparent", "rgba(255,255,255,0.9)", "transparent", "rgba(255,255,255,0.6)", "transparent"],
                     }
                   : {}
               }
               transition={{
-                duration: 200 / speedMultiplier / 1000,
-                times: [0, 0.25, 0.5, 0.75, 1],
+                duration: isFainted
+                  ? 1200 / speedMultiplier / 1000
+                  : 300 / speedMultiplier / 1000,
+                times: isFainted 
+                  ? [0, 0.15, 0.3, 0.7, 1] 
+                  : isTakingDamage 
+                  ? [0, 0.2, 0.4, 0.6, 0.8, 1] 
+                  : [0, 0.25, 0.5, 0.75, 1],
               }}
               className="relative h-full w-full"
             >
@@ -176,9 +237,14 @@ export function PokemonPanel({
             {/* Status Effect Particles */}
             {!isFainted && <StatusEffects status={status} />}
             {isFainted && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50">
-                <span className="text-2xl font-bold text-white">FAINTED</span>
-              </div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.8 / speedMultiplier, duration: 0.3 }}
+                className="absolute inset-0 flex items-center justify-center bg-gray-900/70"
+              >
+                <span className="text-2xl font-bold text-white drop-shadow-lg">FAINTED</span>
+              </motion.div>
             )}
           </motion.div>
         ) : (
@@ -208,7 +274,22 @@ export function PokemonPanel({
         </div>
 
         {/* HP Bar */}
-        <HPBar currentHP={currentHP} maxHP={maxHP} pokemonName={pokemon.name} />
+        <div ref={hpBarRef} className="relative">
+          {showDamageNumber && damageNumberPosition && damageAmount > 0 && (
+            <DamageNumber
+              damage={damageAmount}
+              position={damageNumberPosition}
+              onComplete={() => setShowDamageNumber(false)}
+            />
+          )}
+          <HPBar
+            currentHP={currentHP}
+            maxHP={maxHP}
+            pokemonName={pokemon.name}
+            previousHP={previousHP}
+            isKO={isFainted}
+          />
+        </div>
 
         {/* Status */}
         <div>

@@ -13,7 +13,9 @@ import { BattleLog } from "@/components/battle/BattleLog";
 import { BattleControls } from "@/components/battle/BattleControls";
 import { EffectivenessIndicator } from "@/components/battle/EffectivenessIndicator";
 import { TypeParticles } from "@/components/battle/TypeParticles";
+import { BattleSummaryScreen } from "@/components/battle/BattleSummaryScreen";
 import { calculateMoveEffectiveness, type Effectiveness } from "@/lib/utils/battleHelpers";
+import { useBattleStats } from "@/hooks/useBattleStats";
 import { getAllEliteFourConfigs } from "@/data/eliteFour";
 import type { Pokemon as APIPokemon } from "@/types/api";
 import type { AnimationSpeed } from "@/hooks/useBattleAnimation";
@@ -39,6 +41,11 @@ export function EliteFourArena() {
 
   const [animationSpeed, setAnimationSpeed] = useState<AnimationSpeed>(1);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [pokemon1DamageAmount, setPokemon1DamageAmount] = useState(0);
+  const [pokemon2DamageAmount, setPokemon2DamageAmount] = useState(0);
+  const [pokemon1PreviousHP, setPokemon1PreviousHP] = useState<number | undefined>(undefined);
+  const [pokemon2PreviousHP, setPokemon2PreviousHP] = useState<number | undefined>(undefined);
   
   // Battle view container dimensions for particle positioning
   const battleViewRef = useRef<HTMLDivElement>(null);
@@ -87,6 +94,15 @@ export function EliteFourArena() {
     resetBattle,
   } = battle;
 
+  // Battle statistics tracking (after battle destructuring)
+  const battleStats = useBattleStats({
+    battleState,
+    getActivePokemon,
+    pokemon1Moves,
+    pokemon2Moves,
+    calculateEffectiveness: calculateMoveEffectiveness,
+  });
+
   // Reset log tracking when battle starts
   useEffect(() => {
     if (battleState && battleState.log.length > 0) {
@@ -127,6 +143,8 @@ export function EliteFourArena() {
         }
       } else if (event.type === "damage_dealt") {
         if (event.pokemonIndex === 0) {
+          setPokemon1PreviousHP(currentPokemon1?.currentHP);
+          setPokemon1DamageAmount(event.damage);
           setPokemon1TakingDamage(true);
           if (currentTurnMoveTypesRef.current.move2Type && currentPokemon1) {
             const eff = calculateMoveEffectiveness(
@@ -136,6 +154,8 @@ export function EliteFourArena() {
             setEffectiveness(eff);
           }
         } else {
+          setPokemon2PreviousHP(currentPokemon2?.currentHP);
+          setPokemon2DamageAmount(event.damage);
           setPokemon2TakingDamage(true);
           if (currentTurnMoveTypesRef.current.move1Type && currentPokemon2) {
             const eff = calculateMoveEffectiveness(
@@ -211,6 +231,18 @@ export function EliteFourArena() {
     }
   }, [config, status]);
 
+  // Show summary when battle finishes (MUST be before early returns)
+  const finished = battleState ? isBattleFinished() : false;
+  useEffect(() => {
+    if (finished && !showSummary && battleState && status === "battling") {
+      // Small delay to let faint animation play
+      const timer = setTimeout(() => {
+        setShowSummary(true);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [finished, showSummary, battleState, status, isBattleFinished]);
+
   // Render based on status
   if (status === "lobby") {
     const availableRegions = getAllEliteFourConfigs();
@@ -261,7 +293,7 @@ export function EliteFourArena() {
   if (status === "battling" && battleState && userPokemon && config) {
     const pokemon1 = getActivePokemon(0);
     const pokemon2 = getActivePokemon(1);
-    const finished = isBattleFinished();
+    const winner = getWinner();
 
     const isFinalRound = currentRound === 3 && roundWins.user === 1 && roundWins.opponent === 1;
     const isMasterMode = gameMode === "master";
@@ -412,8 +444,12 @@ export function EliteFourArena() {
                     setPokemon1AttackType(null);
                   }}
                   isTakingDamage={pokemon1TakingDamage}
+                  damageAmount={pokemon1DamageAmount}
+                  previousHP={pokemon1PreviousHP}
                   onDamageComplete={() => {
                     setPokemon1TakingDamage(false);
+                    setPokemon1DamageAmount(0);
+                    setPokemon1PreviousHP(undefined);
                   }}
                   speedMultiplier={animationSpeed}
                 />
@@ -456,7 +492,13 @@ export function EliteFourArena() {
               <BattleControls
                 onReset={() => {
                   resetBattle();
+                  battleStats.reset();
                   resetRun();
+                  setShowSummary(false);
+                  setPokemon1DamageAmount(0);
+                  setPokemon2DamageAmount(0);
+                  setPokemon1PreviousHP(undefined);
+                  setPokemon2PreviousHP(undefined);
                 }}
                 onAutoPlay={handleAutoPlay}
                 onPause={handlePause}
@@ -482,8 +524,12 @@ export function EliteFourArena() {
                     setPokemon2AttackType(null);
                   }}
                   isTakingDamage={pokemon2TakingDamage}
+                  damageAmount={pokemon2DamageAmount}
+                  previousHP={pokemon2PreviousHP}
                   onDamageComplete={() => {
                     setPokemon2TakingDamage(false);
+                    setPokemon2DamageAmount(0);
+                    setPokemon2PreviousHP(undefined);
                   }}
                   speedMultiplier={animationSpeed}
                 />
@@ -498,6 +544,19 @@ export function EliteFourArena() {
             log={battleState.log}
             pokemon1Name={pokemon1?.pokemon.name ?? userPokemon.name}
             pokemon2Name={pokemon2?.pokemon.name ?? opponentPokemon?.name ?? "Opponent"}
+          />
+        )}
+
+        {/* Battle Summary Screen */}
+        {showSummary && finished && (
+          <BattleSummaryScreen
+            stats={battleStats.stats}
+            winner={winner}
+            pokemon1={pokemon1}
+            pokemon2={pokemon2}
+            pokemon1Sprite={pokemon1Sprite}
+            pokemon2Sprite={pokemon2Sprite}
+            onClose={() => setShowSummary(false)}
           />
         )}
       </div>

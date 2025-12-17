@@ -1,16 +1,27 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useEffect, useState, useRef } from "react";
 
 interface HPBarProps {
   currentHP: number;
   maxHP: number;
   pokemonName: string;
+  previousHP?: number; // For calculating damage amount
+  isKO?: boolean; // For KO animation
 }
 
-export function HPBar({ currentHP, maxHP, pokemonName }: HPBarProps) {
+export function HPBar({ currentHP, maxHP, pokemonName, previousHP, isKO = false }: HPBarProps) {
   const percentage = Math.max(0, Math.min(100, (currentHP / maxHP) * 100));
   const isCritical = percentage < 25;
+  const previousPercentage = previousHP !== undefined ? Math.max(0, Math.min(100, (previousHP / maxHP) * 100)) : percentage;
+  
+  // Calculate damage amount
+  const damage = previousHP !== undefined && previousHP > currentHP ? previousHP - currentHP : 0;
+  const hpChange = Math.abs(previousPercentage - percentage);
+  
+  // Animation duration: 800ms for large changes, 400ms for small
+  const animationDuration = hpChange > 20 ? 0.8 : 0.4;
 
   // Color based on HP percentage
   let barColor = "bg-green-500";
@@ -37,7 +48,7 @@ export function HPBar({ currentHP, maxHP, pokemonName }: HPBarProps) {
             width: `${percentage}%`,
           }}
           transition={{
-            duration: 0.5,
+            duration: animationDuration,
             ease: "easeOut",
           }}
           className={`h-full ${barColor} ${isCritical ? "animate-pulse" : ""}`}
@@ -54,6 +65,16 @@ export function HPBar({ currentHP, maxHP, pokemonName }: HPBarProps) {
             }}
             className="absolute inset-0 rounded-full bg-red-600 opacity-50"
           />
+        )}
+        {isKO && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full"
+          >
+            <span className="text-xs font-bold text-white">KO</span>
+          </motion.div>
         )}
       </div>
     </div>

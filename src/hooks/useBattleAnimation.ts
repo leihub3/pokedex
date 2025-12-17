@@ -22,7 +22,7 @@ const ANIMATION_TIMINGS = {
   damage: 500,
   status: 400,
   statChange: 300,
-  faint: 600,
+  faint: 1200, // Increased from 600ms to 1200ms for more dramatic effect
   turnStart: 200,
   default: 300,
 };
