@@ -6,8 +6,17 @@ import Image from "next/image";
 import type { BattleStats } from "@/hooks/useBattleStats";
 import type { ActivePokemon } from "@/battle-engine";
 
+interface AggregateCoreStats {
+  totalTurns: number;
+  damageDealt: number;
+  damageReceived: number;
+  battleDuration: number;
+}
+
 interface BattleSummaryScreenProps {
   stats: BattleStats;
+  /** Optional aggregated stats across multiple battles (e.g. best-of-3 matchup) */
+  aggregateStats?: AggregateCoreStats;
   winner: number | null;
   pokemon1: ActivePokemon | null;
   pokemon2: ActivePokemon | null;
@@ -20,6 +29,7 @@ interface BattleSummaryScreenProps {
 
 export function BattleSummaryScreen({
   stats,
+  aggregateStats,
   winner,
   pokemon1,
   pokemon2,
@@ -82,6 +92,15 @@ export function BattleSummaryScreen({
   const maxHP2 = pokemon2?.maxHP || 100;
   const chartHeight = 150;
   const chartWidth = 400;
+
+  // Values to display in the top cards (can be aggregated across multiple battles)
+  const displayTotalTurns = aggregateStats?.totalTurns ?? stats.totalTurns;
+  const displayBattleDuration =
+    aggregateStats?.battleDuration ?? stats.battleDuration;
+  const displayDamageDealt =
+    aggregateStats?.damageDealt ?? stats.damageDealt.pokemon0;
+  const displayDamageReceived =
+    aggregateStats?.damageReceived ?? stats.damageReceived.pokemon0;
 
   return (
     <AnimatePresence>
@@ -151,25 +170,31 @@ export function BattleSummaryScreen({
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
                   <div className="text-sm text-gray-600 dark:text-gray-400">Total Turns</div>
                   <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    {stats.totalTurns}
-                    {stats.totalTurns === 1 && !stats.lastTurnComplete && (
+                    {displayTotalTurns}
+                    {displayTotalTurns === 1 && !stats.lastTurnComplete && (
                       <span className="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">(ended early)</span>
                     )}
                   </div>
                 </div>
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
                   <div className="text-sm text-gray-600 dark:text-gray-400">Duration</div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{formatDuration(stats.battleDuration)}</div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                    {formatDuration(displayBattleDuration)}
+                  </div>
                 </div>
                 {pokemon1 && (
                   <>
                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
                       <div className="text-sm text-gray-600 dark:text-gray-400">{pokemon1.pokemon.name} Damage Dealt</div>
-                      <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.damageDealt.pokemon0}</div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                        {displayDamageDealt}
+                      </div>
                     </div>
                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900">
                       <div className="text-sm text-gray-600 dark:text-gray-400">{pokemon1.pokemon.name} Damage Received</div>
-                      <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.damageReceived.pokemon0}</div>
+                      <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                        {displayDamageReceived}
+                      </div>
                     </div>
                   </>
                 )}

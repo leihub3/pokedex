@@ -14,6 +14,7 @@ import { BattleControls } from "@/components/battle/BattleControls";
 import { EffectivenessIndicator } from "@/components/battle/EffectivenessIndicator";
 import { TypeParticles } from "@/components/battle/TypeParticles";
 import { BattleSummaryScreen } from "@/components/battle/BattleSummaryScreen";
+import { BattleStatsDisplay } from "@/components/battle/BattleStatsDisplay";
 import { calculateMoveEffectiveness, type Effectiveness } from "@/lib/utils/battleHelpers";
 import { useBattleStats } from "@/hooks/useBattleStats";
 import { getAllEliteFourConfigs } from "@/data/eliteFour";
@@ -245,6 +246,14 @@ export function EliteFourArena() {
   const [preservedPokemon2, setPreservedPokemon2] = useState<ReturnType<typeof getActivePokemon> | null>(null);
   const [preservedWinner, setPreservedWinner] = useState<ReturnType<typeof battle.getWinner> | null>(null);
   const [preservedSprites, setPreservedSprites] = useState<{ pokemon1: string | null; pokemon2: string | null }>({ pokemon1: null, pokemon2: null });
+  // Aggregated core stats across all rounds in the current matchup
+  const [aggregatedMatchupStats, setAggregatedMatchupStats] = useState<{
+    totalTurns: number;
+    damageDealt: number;
+    damageReceived: number;
+    battleDuration: number;
+  } | null>(null);
+  const aggregatedRoundsRef = useRef<Set<string>>(new Set());
   
   // Check if battle is finished
   const finished = battleState ? isBattleFinished() : false;
@@ -261,6 +270,40 @@ export function EliteFourArena() {
     (winner === 0 && roundWins.user === 1) || // User wins and had 1 win already
     (winner === 1 && roundWins.opponent === 1) // Opponent wins and had 1 win already
   );
+
+  // Aggregate core stats for each finished round in this matchup
+  useEffect(() => {
+    if (!finished || !battleState || currentOpponentIndex === null) return;
+
+    const roundKey = `${currentOpponentIndex}-${currentRound}`;
+    if (aggregatedRoundsRef.current.has(roundKey)) return;
+    aggregatedRoundsRef.current.add(roundKey);
+
+    const s = battleStats.stats;
+    setAggregatedMatchupStats((prev) => {
+      const base = prev ?? {
+        totalTurns: 0,
+        damageDealt: 0,
+        damageReceived: 0,
+        battleDuration: 0,
+      };
+      return {
+        totalTurns: base.totalTurns + s.totalTurns,
+        damageDealt: base.damageDealt + s.damageDealt.pokemon0,
+        damageReceived: base.damageReceived + s.damageReceived.pokemon0,
+        battleDuration: base.battleDuration + s.battleDuration,
+      };
+    });
+  }, [
+    finished,
+    battleState,
+    currentOpponentIndex,
+    currentRound,
+    battleStats.stats.totalTurns,
+    battleStats.stats.damageDealt.pokemon0,
+    battleStats.stats.damageReceived.pokemon0,
+    battleStats.stats.battleDuration,
+  ]);
   
   // Preserve battle data early when we detect this battle will complete the matchup
   useEffect(() => {
@@ -396,6 +439,9 @@ export function EliteFourArena() {
         setPreservedPokemon2(null);
         setPreservedWinner(null);
         setPreservedSprites({ pokemon1: null, pokemon2: null });
+        // Reset aggregated stats for new matchup
+        setAggregatedMatchupStats(null);
+        aggregatedRoundsRef.current.clear();
       } else if (hasPendingSummary) {
         console.log("[Summary Debug] Preserved summary data exists for different matchup, not resetting", {
           currentMatchupKey: matchupKey,
@@ -525,28 +571,44 @@ export function EliteFourArena() {
 
         {/* Round Information - Moved here to be closer to battle */}
         {currentOpponent && currentOpponentIndex !== null && (
-          <div className="rounded-lg border-2 border-purple-300 bg-white p-3 shadow-md dark:border-purple-600 dark:bg-gray-800">
-            <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
-                  {isFinalRound ? "Final Round" : `Round ${currentRound}/3`}
-                </span>
-                {isFinalRound && (
-                  <span className="text-xs font-bold text-red-600 dark:text-red-400">
-                    (Deciding Round)
+          <div className="space-y-3">
+            <div className="rounded-lg border-2 border-purple-300 bg-white p-3 shadow-md dark:border-purple-600 dark:bg-gray-800">
+              <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                    {isFinalRound ? "Final Round" : `Round ${currentRound}/3`}
                   </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-lg font-bold">
-                <span className="text-blue-600 dark:text-blue-400">
-                  You {roundWins.user}
-                </span>
-                <span className="text-gray-400">-</span>
-                <span className="text-red-600 dark:text-red-400">
-                  {roundWins.opponent} {currentOpponent.name}
-                </span>
+                  {isFinalRound && (
+                    <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                      (Deciding Round)
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-lg font-bold">
+                  <span className="text-blue-600 dark:text-blue-400">
+                    You {roundWins.user}
+                  </span>
+                  <span className="text-gray-400">-</span>
+                  <span className="text-red-600 dark:text-red-400">
+                    {roundWins.opponent} {currentOpponent.name}
+                  </span>
+                </div>
               </div>
             </div>
+
+            {/* Real-time battle stats for this matchup */}
+            <BattleStatsDisplay
+              stats={battleStats.stats}
+              pokemon1Name={pokemon1?.pokemon.name ?? userPokemon.name}
+              pokemon2Name={
+                pokemon2?.pokemon.name ??
+                opponentPokemon?.name ??
+                currentOpponent.name
+              }
+              currentRound={currentRound}
+              totalRounds={3}
+              roundWins={roundWins}
+            />
           </div>
         )}
 
@@ -719,6 +781,7 @@ export function EliteFourArena() {
       {showSummary && preservedBattleState && preservedPokemon1 && preservedPokemon2 && (
         <BattleSummaryScreen
           stats={battleStats.stats}
+          aggregateStats={aggregatedMatchupStats ?? undefined}
           winner={preservedWinner}
           pokemon1={preservedPokemon1}
           pokemon2={preservedPokemon2}

@@ -10,6 +10,7 @@ import { BattleControls } from "./BattleControls";
 import { EffectivenessIndicator } from "./EffectivenessIndicator";
 import { TypeParticles } from "./TypeParticles";
 import { BattleSummaryScreen } from "./BattleSummaryScreen";
+import { BattleStatsDisplay } from "./BattleStatsDisplay";
 import { calculateMoveEffectiveness, type Effectiveness } from "@/lib/utils/battleHelpers";
 import { useBattleStats } from "@/hooks/useBattleStats";
 import type { Pokemon as APIPokemon } from "@/types/api";
@@ -276,6 +277,13 @@ export function BattleArena() {
 
   return (
     <div className="space-y-6 relative">
+      {/* Real-time battle stats */}
+      <BattleStatsDisplay
+        stats={battleStats.stats}
+        pokemon1Name={pokemon1?.pokemon.name ?? "You"}
+        pokemon2Name={pokemon2?.pokemon.name ?? "Opponent"}
+      />
+
       {/* Effectiveness Indicator - centered above battle */}
       {effectiveness !== null && effectiveness !== 1 && (
         <EffectivenessIndicator
