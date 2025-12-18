@@ -392,57 +392,62 @@ export function PokemonPanel({
       </div>
 
       {/* Pokemon Info */}
-      <div className="space-y-3">
-        {/* Name and Level - Fixed height to accommodate 2 lines */}
-        <div className="flex min-h-[3rem] items-start justify-between">
-          <h3 className="text-xl font-bold capitalize leading-tight text-gray-900 dark:text-gray-100">
-            {pokemon.name}
-          </h3>
-          <span className="flex-shrink-0 text-sm text-gray-600 dark:text-gray-400">
-            Lv. 50
-          </span>
-        </div>
-
-        {/* Types */}
-        <div className="flex gap-2">
-          {pokemon.types.map((type) => (
-            <Badge key={type} variant="type" typeName={type}>
-              {type}
-            </Badge>
-          ))}
-        </div>
-
-        {/* HP Bar */}
-        <div ref={hpBarRef} className="relative">
-          {showDamageNumber && damageNumberPosition && damageAmount > 0 && (
-            <DamageNumber
-              damage={damageAmount}
-              isCritical={isCriticalHit}
-              position={damageNumberPosition}
-              onComplete={() => setShowDamageNumber(false)}
-            />
-          )}
-          <HPBar
-            currentHP={currentHP}
-            maxHP={maxHP}
-            pokemonName={pokemon.name}
-            previousHP={previousHP}
-            isKO={isFainted}
-          />
-          {isCloseCall && !isFainted && (
-            <div className="mt-1 text-xs font-bold uppercase tracking-wide text-red-500 dark:text-red-400">
-              Close Call!
-            </div>
-          )}
-        </div>
-
-        {/* Status */}
+      <div className="flex flex-1 flex-col justify-between">
+        {/* Top: name and level only (variable height) */}
         <div>
-          <StatusBadge status={status} />
+          <div className="min-h-[3rem] flex flex-col gap-0.5 sm:flex-row sm:items-start sm:justify-between">
+            <h3 className="text-lg font-bold capitalize leading-tight text-gray-900 dark:text-gray-100 sm:text-xl">
+              {pokemon.name}
+            </h3>
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-gray-400 sm:text-sm sm:text-right">
+              Lv. 50
+            </span>
+          </div>
         </div>
 
-        {/* Stat Stages */}
-        <StatStageIndicator statStages={statStages} />
+        {/* Bottom: types + HP + status + stat stages, pinned to bottom of the card */}
+        <div className="mt-3 space-y-3">
+          {/* Types */}
+          <div className="flex gap-2">
+            {pokemon.types.map((type) => (
+              <Badge key={type} variant="type" typeName={type}>
+                {type}
+              </Badge>
+            ))}
+          </div>
+
+          {/* HP Bar */}
+          <div ref={hpBarRef} className="relative">
+            {showDamageNumber && damageNumberPosition && damageAmount > 0 && (
+              <DamageNumber
+                damage={damageAmount}
+                isCritical={isCriticalHit}
+                position={damageNumberPosition}
+                onComplete={() => setShowDamageNumber(false)}
+              />
+            )}
+            <HPBar
+              currentHP={currentHP}
+              maxHP={maxHP}
+              pokemonName={pokemon.name}
+              previousHP={previousHP}
+              isKO={isFainted}
+            />
+            {isCloseCall && !isFainted && (
+              <div className="mt-1 text-xs font-bold uppercase tracking-wide text-red-500 dark:text-red-400">
+                Close Call!
+              </div>
+            )}
+          </div>
+
+          {/* Status */}
+          <div>
+            <StatusBadge status={status} />
+          </div>
+
+          {/* Stat Stages */}
+          <StatStageIndicator statStages={statStages} />
+        </div>
       </div>
     </motion.div>
   );

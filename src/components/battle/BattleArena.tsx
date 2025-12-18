@@ -13,11 +13,13 @@ import { BattleSummaryScreen } from "./BattleSummaryScreen";
 import { BattleIntro } from "./BattleIntro";
 import { BattleStatsDisplay } from "./BattleStatsDisplay";
 import { CriticalHitEffect } from "./CriticalHitEffect";
+import { BattleCommentary } from "./BattleCommentary";
 import { calculateMoveEffectiveness, type Effectiveness } from "@/lib/utils/battleHelpers";
 import { useBattleStats } from "@/hooks/useBattleStats";
 import type { Pokemon as APIPokemon } from "@/types/api";
 import type { AnimationSpeed } from "@/hooks/useBattleAnimation";
 import type { BattleEvent } from "@/battle-engine";
+import { useSettingsStore } from "@/store/settingsStore";
 
 export function BattleArena() {
   const {
@@ -53,12 +55,15 @@ export function BattleArena() {
   const [pokemon2PreviousHP, setPokemon2PreviousHP] = useState<number | undefined>(undefined);
   const [pokemon1CriticalHit, setPokemon1CriticalHit] = useState(false);
   const [pokemon2CriticalHit, setPokemon2CriticalHit] = useState(false);
+  const [commentary, setCommentary] = useState<string | null>(null);
   
   // Battle view container dimensions for particle positioning
   const battleViewRef = useRef<HTMLDivElement>(null);
   const [battleViewDimensions, setBattleViewDimensions] = useState({ width: 1200, height: 400 });
   const [criticalEffectPosition, setCriticalEffectPosition] = useState<{ x: number; y: number } | null>(null);
   const [criticalEffectId, setCriticalEffectId] = useState(0);
+
+  const { battleCommentaryEnabled } = useSettingsStore();
 
   // Battle statistics tracking
   const battleStats = useBattleStats({
@@ -98,6 +103,14 @@ export function BattleArena() {
     move2Type: null,
   });
 
+  const hasShownCloseMatchRef = useRef(false);
+  const hasShownOneMoreHitRef = useRef(false);
+  const hasShownHeatingUpRef = useRef(false);
+  const hasShownHeavyDamageRef = useRef<{ pokemon0: boolean; pokemon1: boolean }>({
+    pokemon0: false,
+    pokemon1: false,
+  });
+
   const triggerCriticalEffect = (target: "pokemon1" | "pokemon2") => {
     const x =
       target === "pokemon1"
@@ -107,6 +120,9 @@ export function BattleArena() {
     setCriticalEffectPosition({ x, y });
     setCriticalEffectId((prev) => prev + 1);
   };
+
+  const canShowCommentary = () =>
+    battleCommentaryEnabled && !commentary;
 
   // Reset log tracking when battle starts
   useEffect(() => {
@@ -152,7 +168,7 @@ export function BattleArena() {
           }
         }
       } else if (event.type === "damage_dealt") {
-        // Trigger damage animation and track damage amounts
+        // Trigger damage animation, commentary, and track damage amounts
         if (event.pokemonIndex === 0) {
           const defender = currentPokemon1;
           const isCrit =
@@ -167,6 +183,9 @@ export function BattleArena() {
 
           if (isCrit) {
             triggerCriticalEffect("pokemon1");
+            if (canShowCommentary()) {
+              setCommentary("A critical hit!");
+            }
           }
 
           // Calculate effectiveness for damage to pokemon1 (defender)
@@ -177,6 +196,22 @@ export function BattleArena() {
               defender.pokemon.types
             );
             setEffectiveness(eff);
+
+            if (eff > 1 && canShowCommentary()) {
+              setCommentary("That's super effective!");
+            }
+          }
+
+          // Heavy damage warning when HP falls below 30% for the first time
+          if (
+            defender &&
+            defender.maxHP > 0 &&
+            defender.currentHP / defender.maxHP < 0.3 &&
+            !hasShownHeavyDamageRef.current.pokemon0 &&
+            canShowCommentary()
+          ) {
+            hasShownHeavyDamageRef.current.pokemon0 = true;
+            setCommentary(`${defender.pokemon.name} is taking heavy damage!`);
           }
         } else {
           const defender = currentPokemon2;
@@ -192,6 +227,9 @@ export function BattleArena() {
 
           if (isCrit) {
             triggerCriticalEffect("pokemon2");
+            if (canShowCommentary()) {
+              setCommentary("A critical hit!");
+            }
           }
 
           // Calculate effectiveness for damage to pokemon2 (defender)
@@ -202,6 +240,21 @@ export function BattleArena() {
               defender.pokemon.types
             );
             setEffectiveness(eff);
+
+            if (eff > 1 && canShowCommentary()) {
+              setCommentary("That's super effective!");
+            }
+          }
+
+          if (
+            defender &&
+            defender.maxHP > 0 &&
+            defender.currentHP / defender.maxHP < 0.3 &&
+            !hasShownHeavyDamageRef.current.pokemon1 &&
+            canShowCommentary()
+          ) {
+            hasShownHeavyDamageRef.current.pokemon1 = true;
+            setCommentary(`${defender.pokemon.name} is taking heavy damage!`);
           }
         }
       }
@@ -328,6 +381,53 @@ export function BattleArena() {
     }
   }, [effectiveness, animationSpeed]);
 
+  // Commentary based on overall battle state (close match, one more hit, heating up)
+  useEffect(() => {
+    if (!battleState || !battleCommentaryEnabled || !getActivePokemon) return;
+
+    const active1 = getActivePokemon(0);
+    const active2 = getActivePokemon(1);
+    if (!active1 || !active2) return;
+
+    const frac1 = active1.maxHP > 0 ? active1.currentHP / active1.maxHP : 0;
+    const frac2 = active2.maxHP > 0 ? active2.currentHP / active2.maxHP : 0;
+    const diff = Math.abs(frac1 - frac2);
+
+    // "It's a close match!" when HP percentages are within 20%
+    if (
+      !hasShownCloseMatchRef.current &&
+      battleState.turnNumber >= 2 &&
+      diff < 0.2 &&
+      canShowCommentary()
+    ) {
+      hasShownCloseMatchRef.current = true;
+      setCommentary("It's a close match!");
+      return;
+    }
+
+    // "One more hit could decide this!" when either HP < 15%
+    if (
+      !hasShownOneMoreHitRef.current &&
+      ((frac1 > 0 && frac1 < 0.15) || (frac2 > 0 && frac2 < 0.15)) &&
+      canShowCommentary()
+    ) {
+      hasShownOneMoreHitRef.current = true;
+      setCommentary("One more hit could decide this!");
+      return;
+    }
+
+    // "The battle is heating up!" after 5+ turns
+    if (
+      !hasShownHeatingUpRef.current &&
+      battleState.turnNumber >= 5 &&
+      canShowCommentary()
+    ) {
+      hasShownHeatingUpRef.current = true;
+      setCommentary("The battle is heating up!");
+      return;
+    }
+  }, [battleState, battleCommentaryEnabled, getActivePokemon, commentary]);
+
   // Show selection UI if battle not started
   if (!battle || !battleState) {
     if (showIntro && selectedPokemon1 && selectedPokemon2) {
@@ -356,7 +456,7 @@ export function BattleArena() {
   const winner = getWinner();
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-6">
       {/* Real-time battle stats */}
       <BattleStatsDisplay
         stats={battleStats.stats}
@@ -374,6 +474,11 @@ export function BattleArena() {
 
       {/* Battle View */}
       <div className="grid gap-6 lg:grid-cols-3 relative" ref={battleViewRef}>
+        <BattleCommentary
+          message={commentary}
+          speedMultiplier={animationSpeed}
+          onHide={() => setCommentary(null)}
+        />
         {/* Type Particles - rendered here for proper positioning */}
         {pokemon1Attacking && pokemon1AttackType && (
           <TypeParticles
