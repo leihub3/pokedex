@@ -44,7 +44,9 @@ export function PokemonPanel({
 }: PokemonPanelProps) {
   const { pokemon, currentHP, maxHP, status, statStages } = activePokemon;
   const isFainted = currentHP <= 0;
-  const isLowHP = (currentHP / maxHP) < 0.25; // Less than 25% HP
+  const hpFraction = maxHP > 0 ? currentHP / maxHP : 0;
+  const isLowHP = hpFraction < 0.25; // Less than 25% HP
+  const isCloseCall = !isFainted && hpFraction > 0 && hpFraction < 0.1; // <10% HP
   const containerRef = useRef<HTMLDivElement>(null);
   const hpBarRef = useRef<HTMLDivElement>(null);
   const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
@@ -152,6 +154,26 @@ export function PokemonPanel({
           }}
           style={{
             border: "2px solid rgba(239, 68, 68, 0.8)",
+          }}
+        />
+      )}
+      
+      {/* Close Call overlay - extra dramatic tint when HP is extremely low (<10%) */}
+      {isCloseCall && !isFainted && !prefersReducedMotion && (
+        <motion.div
+          className="absolute inset-0 rounded-xl pointer-events-none z-20"
+          initial={{ opacity: 0 }}
+          animate={{
+            opacity: [0.2, 0.6, 0.4, 0.7, 0.3],
+          }}
+          transition={{
+            duration: 1.4,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at center, rgba(248,113,113,0.35), rgba(15,23,42,0.9))",
           }}
         />
       )}
@@ -407,6 +429,11 @@ export function PokemonPanel({
             previousHP={previousHP}
             isKO={isFainted}
           />
+          {isCloseCall && !isFainted && (
+            <div className="mt-1 text-xs font-bold uppercase tracking-wide text-red-500 dark:text-red-400">
+              Close Call!
+            </div>
+          )}
         </div>
 
         {/* Status */}

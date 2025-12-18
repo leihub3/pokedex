@@ -60,6 +60,16 @@ export function useBattleStats({
     move2Name: null,
   });
 
+  // Heuristic: treat very high-damage hits as "critical hits"
+  // We don't currently have an explicit critical flag from the battle engine,
+  // so we approximate based on the fraction of max HP removed in a single hit.
+  const isCriticalDamage = (damage: number, defender: ActivePokemon | null): boolean => {
+    if (!defender || defender.maxHP <= 0) return false;
+    const fraction = damage / defender.maxHP;
+    // Consider it a critical hit if a single hit removes at least 35% of max HP
+    return fraction >= 0.35;
+  };
+
   // Track HP changes over time
   const trackHPHistory = useCallback((turn: number) => {
     const pokemon0 = getActivePokemon(0);
@@ -184,6 +194,9 @@ export function useBattleStats({
                 newStats.damageReceived.pokemon1 += event.damage;
               }
 
+              // Look up defender once for effectiveness + crit heuristics
+              const defender = getActivePokemon(defenderIndex as 0 | 1);
+
               // Calculate effectiveness if function is provided
               if (calculateEffectiveness) {
                 const moveType =
@@ -191,7 +204,6 @@ export function useBattleStats({
                     ? currentTurnMoveTypesRef.current.move1Type
                     : currentTurnMoveTypesRef.current.move2Type;
 
-                const defender = getActivePokemon(defenderIndex as 0 | 1);
                 if (moveType && defender) {
                   const effectiveness = calculateEffectiveness(
                     moveType,
@@ -199,6 +211,15 @@ export function useBattleStats({
                   );
                   const currentCount = newStats.effectivenessCounts.get(effectiveness) || 0;
                   newStats.effectivenessCounts.set(effectiveness, currentCount + 1);
+                }
+              }
+
+              // Track "critical hits" using the same heuristic used for visuals
+              if (isCriticalDamage(event.damage, defender)) {
+                if (attackerIndex === 0) {
+                  newStats.criticalHits.pokemon0 += 1;
+                } else {
+                  newStats.criticalHits.pokemon1 += 1;
                 }
               }
 

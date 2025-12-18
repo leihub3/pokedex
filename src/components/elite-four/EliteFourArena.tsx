@@ -16,6 +16,7 @@ import { TypeParticles } from "@/components/battle/TypeParticles";
 import { BattleSummaryScreen } from "@/components/battle/BattleSummaryScreen";
 import { BattleStatsDisplay } from "@/components/battle/BattleStatsDisplay";
 import { BattleIntro } from "@/components/battle/BattleIntro";
+import { CriticalHitEffect } from "@/components/battle/CriticalHitEffect";
 import { calculateMoveEffectiveness, type Effectiveness } from "@/lib/utils/battleHelpers";
 import { useBattleStats } from "@/hooks/useBattleStats";
 import { getAllEliteFourConfigs } from "@/data/eliteFour";
@@ -50,10 +51,14 @@ export function EliteFourArena() {
   const [pokemon2DamageAmount, setPokemon2DamageAmount] = useState(0);
   const [pokemon1PreviousHP, setPokemon1PreviousHP] = useState<number | undefined>(undefined);
   const [pokemon2PreviousHP, setPokemon2PreviousHP] = useState<number | undefined>(undefined);
+  const [pokemon1CriticalHit, setPokemon1CriticalHit] = useState(false);
+  const [pokemon2CriticalHit, setPokemon2CriticalHit] = useState(false);
   
   // Battle view container dimensions for particle positioning
   const battleViewRef = useRef<HTMLDivElement>(null);
   const [battleViewDimensions, setBattleViewDimensions] = useState({ width: 1200, height: 400 });
+  const [criticalEffectPosition, setCriticalEffectPosition] = useState<{ x: number; y: number } | null>(null);
+  const [criticalEffectId, setCriticalEffectId] = useState(0);
 
   // Measure actual battle view container dimensions
   useEffect(() => {
@@ -86,6 +91,16 @@ export function EliteFourArena() {
   });
   // Track if we've already shown the intro for this matchup (per opponent)
   const introShownForMatchupRef = useRef<string | null>(null);
+
+  const triggerCriticalEffect = (target: "pokemon1" | "pokemon2") => {
+    const x =
+      target === "pokemon1"
+        ? battleViewDimensions.width * 0.25
+        : battleViewDimensions.width * 0.75;
+    const y = battleViewDimensions.height * 0.35;
+    setCriticalEffectPosition({ x, y });
+    setCriticalEffectId((prev) => prev + 1);
+  };
 
   const {
     battleState,
@@ -151,24 +166,48 @@ export function EliteFourArena() {
         }
       } else if (event.type === "damage_dealt") {
         if (event.pokemonIndex === 0) {
-          setPokemon1PreviousHP(currentPokemon1?.currentHP);
+          const defender = currentPokemon1;
+          const isCrit =
+            defender && defender.maxHP > 0
+              ? event.damage / defender.maxHP >= 0.35
+              : false;
+
+          setPokemon1PreviousHP(defender?.currentHP);
           setPokemon1DamageAmount(event.damage);
           setPokemon1TakingDamage(true);
-          if (currentTurnMoveTypesRef.current.move2Type && currentPokemon1) {
+          setPokemon1CriticalHit(isCrit);
+
+          if (isCrit) {
+            triggerCriticalEffect("pokemon1");
+          }
+
+          if (currentTurnMoveTypesRef.current.move2Type && defender) {
             const eff = calculateMoveEffectiveness(
               currentTurnMoveTypesRef.current.move2Type,
-              currentPokemon1.pokemon.types
+              defender.pokemon.types
             );
             setEffectiveness(eff);
           }
         } else {
-          setPokemon2PreviousHP(currentPokemon2?.currentHP);
+          const defender = currentPokemon2;
+          const isCrit =
+            defender && defender.maxHP > 0
+              ? event.damage / defender.maxHP >= 0.35
+              : false;
+
+          setPokemon2PreviousHP(defender?.currentHP);
           setPokemon2DamageAmount(event.damage);
           setPokemon2TakingDamage(true);
-          if (currentTurnMoveTypesRef.current.move1Type && currentPokemon2) {
+          setPokemon2CriticalHit(isCrit);
+
+          if (isCrit) {
+            triggerCriticalEffect("pokemon2");
+          }
+
+          if (currentTurnMoveTypesRef.current.move1Type && defender) {
             const eff = calculateMoveEffectiveness(
               currentTurnMoveTypesRef.current.move1Type,
-              currentPokemon2.pokemon.types
+              defender.pokemon.types
             );
             setEffectiveness(eff);
           }
@@ -649,6 +688,17 @@ export function EliteFourArena() {
               speedMultiplier={animationSpeed}
             />
           )}
+          {/* Critical hit star burst overlay */}
+          {criticalEffectPosition && (
+            <CriticalHitEffect
+              key={criticalEffectId}
+              containerWidth={battleViewDimensions.width}
+              containerHeight={battleViewDimensions.height}
+              position={criticalEffectPosition}
+              speedMultiplier={animationSpeed}
+              onComplete={() => setCriticalEffectPosition(null)}
+            />
+          )}
           {pokemon2Attacking && pokemon2AttackType && (
             <TypeParticles
               type={pokemon2AttackType}
@@ -679,11 +729,13 @@ export function EliteFourArena() {
                   }}
                   isTakingDamage={pokemon1TakingDamage}
                   damageAmount={pokemon1DamageAmount}
+                  isCriticalHit={pokemon1CriticalHit}
                   previousHP={pokemon1PreviousHP}
                   onDamageComplete={() => {
                     setPokemon1TakingDamage(false);
                     setPokemon1DamageAmount(0);
                     setPokemon1PreviousHP(undefined);
+                    setPokemon1CriticalHit(false);
                   }}
                   speedMultiplier={animationSpeed}
                 />
@@ -733,6 +785,8 @@ export function EliteFourArena() {
                   setPokemon2DamageAmount(0);
                   setPokemon1PreviousHP(undefined);
                   setPokemon2PreviousHP(undefined);
+                  setPokemon1CriticalHit(false);
+                  setPokemon2CriticalHit(false);
                 }}
                 onAutoPlay={handleAutoPlay}
                 onPause={handlePause}
@@ -759,11 +813,13 @@ export function EliteFourArena() {
                   }}
                   isTakingDamage={pokemon2TakingDamage}
                   damageAmount={pokemon2DamageAmount}
+                  isCriticalHit={pokemon2CriticalHit}
                   previousHP={pokemon2PreviousHP}
                   onDamageComplete={() => {
                     setPokemon2TakingDamage(false);
                     setPokemon2DamageAmount(0);
                     setPokemon2PreviousHP(undefined);
+                    setPokemon2CriticalHit(false);
                   }}
                   speedMultiplier={animationSpeed}
                 />
