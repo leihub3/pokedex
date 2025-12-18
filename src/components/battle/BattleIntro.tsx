@@ -93,7 +93,7 @@ export function BattleIntro({
           animate={{ scale: 1.1, opacity: 1 }}
           exit={{ scale: 0.8, opacity: 0 }}
           transition={{ duration: 0.35 }}
-          className="text-5xl font-extrabold tracking-wide text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.7)]"
+          className="text-6xl font-extrabold tracking-tight text-emerald-400 drop-shadow-[0_0_10px_rgba(16,185,129,0.7)]"
         >
           GO!
         </motion.div>
@@ -183,7 +183,7 @@ export function BattleIntro({
                 VS
               </motion.div>
 
-              <div className="mt-1 flex h-20 items-center justify-center">
+              <div className="mt-1 flex h-20 w-24 items-center justify-center sm:w-28">
                 <AnimatePresence mode="wait">
                   {renderCenterLabel()}
                 </AnimatePresence>
