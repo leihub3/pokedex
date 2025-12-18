@@ -11,6 +11,10 @@ interface BattleStatsDisplayProps {
   totalRounds?: number;
   /** Optional round wins (used in Elite Four) */
   roundWins?: { user: number; opponent: number };
+  /** Control whether to show the round pill */
+  showRoundInfo?: boolean;
+  /** Control whether to show the score text */
+  showScore?: boolean;
 }
 
 export function BattleStatsDisplay({
@@ -20,6 +24,8 @@ export function BattleStatsDisplay({
   currentRound,
   totalRounds = currentRound ? 3 : undefined,
   roundWins,
+  showRoundInfo = true,
+  showScore = true,
 }: BattleStatsDisplayProps) {
   const turnsLabel =
     stats.totalTurns === 0
@@ -45,12 +51,12 @@ export function BattleStatsDisplay({
   const dealtRatio = Math.min(1, Math.max(0, damageDealt / totalDamage));
 
   const roundLabel =
-    currentRound && totalRounds
+    showRoundInfo && currentRound && totalRounds
       ? `Round ${currentRound}/${totalRounds}`
       : undefined;
 
   const scoreLabel =
-    roundWins != null
+    showScore && roundWins != null
       ? `Score: ${roundWins.user} – ${roundWins.opponent}`
       : undefined;
 
@@ -117,5 +123,6 @@ export function BattleStatsDisplay({
     </motion.div>
   );
 }
+
 
 

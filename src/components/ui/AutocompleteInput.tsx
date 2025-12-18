@@ -39,6 +39,12 @@ export function AutocompleteInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Use a stable key for recentOptions so the effect doesn't re-run on every render
+  // when recentOptions is using the default [] (new array each render)
+  const recentOptionsKey = Array.isArray(recentOptions)
+    ? recentOptions.join("|")
+    : "";
+
   useEffect(() => {
     if (value.trim().length > 0) {
       const filtered = options
@@ -63,7 +69,7 @@ export function AutocompleteInput({
       }
     }
     setHighlightedIndex(-1);
-  }, [value, options, maxSuggestions, recentOptions]);
+  }, [value, options, maxSuggestions, recentOptionsKey]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

@@ -24,6 +24,10 @@ export function EliteFourProgress({
   currentRound = 1,
   roundWins = { user: 0, opponent: 0 },
 }: EliteFourProgressProps) {
+  // Derive a simple region label (e.g. "Kanto", "Johto") from the config id
+  const regionLabel =
+    config.id.charAt(0).toUpperCase() + config.id.slice(1);
+
   const isDefeated = (opponentId: string) => defeatedOpponents.includes(opponentId);
   const isCurrent = (index: number) => currentOpponentIndex === index;
   
@@ -46,9 +50,14 @@ export function EliteFourProgress({
   return (
     <div className="mb-6 rounded-lg border-2 border-purple-500 bg-gradient-to-br from-purple-50 to-indigo-50 p-4 shadow-lg dark:from-purple-900/20 dark:to-indigo-900/20">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-          Progress
-        </h2>
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            Progress
+          </h2>
+          <p className="text-xs font-semibold text-purple-700 dark:text-purple-300">
+            Region: {regionLabel}
+          </p>
+        </div>
         {userPokemon && (
           <div className="flex items-center gap-2">
             <div className="relative h-10 w-10">

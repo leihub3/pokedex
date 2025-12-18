@@ -618,6 +618,8 @@ export function EliteFourArena() {
               currentRound={currentRound}
               totalRounds={3}
               roundWins={roundWins}
+              showRoundInfo={false}
+              showScore={false}
             />
           </div>
         )}
