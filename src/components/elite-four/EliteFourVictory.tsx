@@ -4,6 +4,8 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import type { EliteFourConfig } from "@/data/eliteFour";
 import type { Pokemon } from "@/types/api";
+import type { BattleStats } from "@/hooks/useBattleStats";
+import { BattleResultsExtended } from "@/components/battle/BattleResultsExtended";
 import { useEliteFourCareerStore } from "@/store/eliteFourCareerStore";
 import { getAllEliteFourConfigs } from "@/data/eliteFour";
 import Image from "next/image";
@@ -11,6 +13,8 @@ import Image from "next/image";
 interface EliteFourVictoryProps {
   config: EliteFourConfig;
   userPokemon: Pokemon;
+  finalStats?: BattleStats;
+  winnerIndex?: 0 | 1 | null;
   onRestart: () => void;
   onContinueCareer?: () => void;
 }
@@ -18,6 +22,8 @@ interface EliteFourVictoryProps {
 export function EliteFourVictory({
   config,
   userPokemon,
+  finalStats,
+  winnerIndex = 0,
   onRestart,
   onContinueCareer,
 }: EliteFourVictoryProps) {
@@ -325,6 +331,16 @@ export function EliteFourVictory({
             </li>
           </ul>
         </motion.div>
+
+        {/* Extended Battle Results (final challenge battle) */}
+        {finalStats && (
+          <BattleResultsExtended
+            stats={finalStats}
+            winnerIndex={winnerIndex}
+            playerIndex={0}
+            storageKey="elite-four"
+          />
+        )}
 
         {/* Unlock Messages */}
         {showUnlockAnimation && nextRegion && (

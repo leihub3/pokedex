@@ -527,6 +527,8 @@ export function EliteFourArena() {
       <EliteFourVictory
         config={config}
         userPokemon={userPokemon}
+        finalStats={battleStats.stats}
+        winnerIndex={0}
         onRestart={resetRun}
         onContinueCareer={resetRun} // For now, same as restart - will implement actual continuation later
       />
@@ -539,6 +541,8 @@ export function EliteFourArena() {
         defeatedBy={currentOpponent}
         defeatedByPokemon={opponentPokemon}
         defeatedOpponents={defeatedOpponents}
+        finalStats={battleStats.stats}
+        winnerIndex={1}
         onRestart={resetRun}
       />
     );

@@ -3,6 +3,8 @@
 import { motion } from "framer-motion";
 import type { EliteFourConfig, EliteFourMember, EliteFourChampion } from "@/data/eliteFour";
 import type { Pokemon } from "@/types/api";
+import type { BattleStats } from "@/hooks/useBattleStats";
+import { BattleResultsExtended } from "@/components/battle/BattleResultsExtended";
 import Image from "next/image";
 
 interface EliteFourDefeatProps {
@@ -11,6 +13,8 @@ interface EliteFourDefeatProps {
   defeatedBy: EliteFourMember | EliteFourChampion | null;
   defeatedByPokemon: Pokemon | null;
   defeatedOpponents: string[];
+  finalStats?: BattleStats;
+  winnerIndex?: 0 | 1 | null;
   onRestart: () => void;
 }
 
@@ -20,6 +24,8 @@ export function EliteFourDefeat({
   defeatedBy,
   defeatedByPokemon,
   defeatedOpponents,
+  finalStats,
+  winnerIndex = 1,
   onRestart,
 }: EliteFourDefeatProps) {
   const isChampion = defeatedBy?.id === config.champion.id;
@@ -109,6 +115,16 @@ export function EliteFourDefeat({
               {defeatedOpponents.length !== 1 ? "s" : ""} before being defeated.
             </p>
           </motion.div>
+        )}
+
+        {/* Extended Battle Results (final challenge battle) */}
+        {finalStats && (
+          <BattleResultsExtended
+            stats={finalStats}
+            winnerIndex={winnerIndex}
+            playerIndex={0}
+            storageKey="elite-four"
+          />
         )}
 
         {/* Restart Button */}
