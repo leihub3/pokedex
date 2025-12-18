@@ -26,6 +26,8 @@ import type { AnimationSpeed } from "@/hooks/useBattleAnimation";
 import { useEliteFourCareerStore } from "@/store/eliteFourCareerStore";
 import { useSettingsStore } from "@/store/settingsStore";
 
+const COMMENTARY_ENABLED = false;
+
 export function EliteFourArena() {
   const eliteFour = useEliteFour();
   const { gameMode, getMasterModeProgress } = useEliteFourCareerStore();
@@ -63,7 +65,8 @@ export function EliteFourArena() {
   const [criticalEffectPosition, setCriticalEffectPosition] = useState<{ x: number; y: number } | null>(null);
   const [criticalEffectId, setCriticalEffectId] = useState(0);
 
-  const { battleCommentaryEnabled } = useSettingsStore();
+  const { battleCommentaryEnabled, cinematicModeEnabled, setCinematicModeEnabled } =
+    useSettingsStore();
 
   // Measure actual battle view container dimensions
   useEffect(() => {
@@ -116,7 +119,9 @@ export function EliteFourArena() {
   };
 
   const canShowCommentary = () =>
-    battleCommentaryEnabled && !commentary;
+    COMMENTARY_ENABLED && battleCommentaryEnabled && !commentary;
+
+  const speedFactor = cinematicModeEnabled ? animationSpeed * 0.75 : animationSpeed;
 
   const {
     battleState,
@@ -274,7 +279,7 @@ export function EliteFourArena() {
       return;
     }
 
-    const baseDelay = 2500 / animationSpeed;
+    const baseDelay = 2500 / speedFactor;
     const interval = setInterval(() => {
       if (!battle.battle || isBattleFinished() || battle.isAnimating) {
         setIsAutoPlaying(false);
@@ -287,17 +292,17 @@ export function EliteFourArena() {
     }, baseDelay);
 
     return () => clearInterval(interval);
-  }, [isAutoPlaying, battle.battle, pokemon1Moves.length, pokemon2Moves.length, isBattleFinished, battle.isAnimating, executeTurn, animationSpeed]);
+  }, [isAutoPlaying, battle.battle, pokemon1Moves.length, pokemon2Moves.length, isBattleFinished, battle.isAnimating, executeTurn, speedFactor]);
 
   // Reset effectiveness after display
   useEffect(() => {
     if (effectiveness !== null) {
       const timer = setTimeout(() => {
         setEffectiveness(null);
-      }, 2000 / animationSpeed);
+      }, 2000 / speedFactor);
       return () => clearTimeout(timer);
     }
-  }, [effectiveness, animationSpeed]);
+  }, [effectiveness, speedFactor]);
 
   // Commentary based on overall battle state (close match, one more hit, heating up)
   useEffect(() => {
@@ -559,6 +564,7 @@ export function EliteFourArena() {
       // Show intro once per matchup (per opponent)
       if (introShownForMatchupRef.current !== matchupKey) {
         introShownForMatchupRef.current = matchupKey;
+        setCommentary(null);
         setShowIntro(true);
       }
       // If we're starting a new matchup (different opponent), reset summary tracking
@@ -769,7 +775,7 @@ export function EliteFourArena() {
             <div className="absolute left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-full flex justify-center">
               <EffectivenessIndicator
                 effectiveness={effectiveness}
-                speedMultiplier={animationSpeed}
+                speedMultiplier={speedFactor}
               />
             </div>
           </div>
@@ -777,11 +783,13 @@ export function EliteFourArena() {
 
         {/* Battle View */}
         <div className="relative" ref={battleViewRef}>
-          <BattleCommentary
-            message={commentary}
-            speedMultiplier={animationSpeed}
-            onHide={() => setCommentary(null)}
-          />
+          {COMMENTARY_ENABLED && (
+            <BattleCommentary
+              message={showIntro ? null : commentary}
+              speedMultiplier={speedFactor}
+              onHide={() => setCommentary(null)}
+            />
+          )}
           {/* Type Particles */}
           {pokemon1Attacking && pokemon1AttackType && (
             <TypeParticles
@@ -790,7 +798,7 @@ export function EliteFourArena() {
               toPosition="right"
               containerWidth={battleViewDimensions.width}
               containerHeight={battleViewDimensions.height}
-              speedMultiplier={animationSpeed}
+              speedMultiplier={speedFactor}
             />
           )}
           {/* Critical hit star burst overlay */}
@@ -800,7 +808,7 @@ export function EliteFourArena() {
               containerWidth={battleViewDimensions.width}
               containerHeight={battleViewDimensions.height}
               position={criticalEffectPosition}
-              speedMultiplier={animationSpeed}
+              speedMultiplier={speedFactor}
               onComplete={() => setCriticalEffectPosition(null)}
             />
           )}
@@ -811,7 +819,7 @@ export function EliteFourArena() {
               toPosition="left"
               containerWidth={battleViewDimensions.width}
               containerHeight={battleViewDimensions.height}
-              speedMultiplier={animationSpeed}
+              speedMultiplier={speedFactor}
             />
           )}
 
@@ -842,7 +850,7 @@ export function EliteFourArena() {
                     setPokemon1PreviousHP(undefined);
                     setPokemon1CriticalHit(false);
                   }}
-                  speedMultiplier={animationSpeed}
+                  speedMultiplier={speedFactor}
                 />
               )}
             </div>
@@ -899,6 +907,8 @@ export function EliteFourArena() {
                 canReplay={false}
                 animationSpeed={animationSpeed}
                 onSpeedChange={setAnimationSpeed}
+                cinematicEnabled={cinematicModeEnabled}
+                onToggleCinematic={setCinematicModeEnabled}
               />
             </div>
 
@@ -926,7 +936,7 @@ export function EliteFourArena() {
                     setPokemon2PreviousHP(undefined);
                     setPokemon2CriticalHit(false);
                   }}
-                  speedMultiplier={animationSpeed}
+                  speedMultiplier={speedFactor}
                 />
               )}
             </div>

@@ -21,6 +21,8 @@ import type { AnimationSpeed } from "@/hooks/useBattleAnimation";
 import type { BattleEvent } from "@/battle-engine";
 import { useSettingsStore } from "@/store/settingsStore";
 
+const COMMENTARY_ENABLED = false;
+
 export function BattleArena() {
   const {
     battle,
@@ -63,7 +65,8 @@ export function BattleArena() {
   const [criticalEffectPosition, setCriticalEffectPosition] = useState<{ x: number; y: number } | null>(null);
   const [criticalEffectId, setCriticalEffectId] = useState(0);
 
-  const { battleCommentaryEnabled } = useSettingsStore();
+  const { battleCommentaryEnabled, cinematicModeEnabled, setCinematicModeEnabled } =
+    useSettingsStore();
 
   // Battle statistics tracking
   const battleStats = useBattleStats({
@@ -122,7 +125,9 @@ export function BattleArena() {
   };
 
   const canShowCommentary = () =>
-    battleCommentaryEnabled && !commentary;
+    COMMENTARY_ENABLED && battleCommentaryEnabled && !commentary;
+
+  const speedFactor = cinematicModeEnabled ? animationSpeed * 0.75 : animationSpeed;
 
   // Reset log tracking when battle starts
   useEffect(() => {
@@ -267,7 +272,7 @@ export function BattleArena() {
       return;
     }
 
-    const baseDelay = 2500 / animationSpeed; // Adjust for speed multiplier
+    const baseDelay = 2500 / speedFactor; // Adjust for (possibly cinematic) speed multiplier
     const interval = setInterval(() => {
       if (!battle || isBattleFinished() || isAnimating) {
         setIsAutoPlaying(false);
@@ -281,7 +286,7 @@ export function BattleArena() {
     }, baseDelay);
 
     return () => clearInterval(interval);
-  }, [isAutoPlaying, battle, pokemon1Moves.length, pokemon2Moves.length, isBattleFinished, isAnimating, executeTurn, animationSpeed]);
+  }, [isAutoPlaying, battle, pokemon1Moves.length, pokemon2Moves.length, isBattleFinished, isAnimating, executeTurn, speedFactor]);
 
   const handleAutoPlay = () => {
     setIsAutoPlaying(true);
@@ -304,6 +309,7 @@ export function BattleArena() {
     setSelectedPokemon1(pokemon1);
     setSelectedPokemon2(pokemon2);
     battleStats.reset();
+    setCommentary(null);
     setShowIntro(true);
   };
 
@@ -376,10 +382,10 @@ export function BattleArena() {
     if (effectiveness !== null) {
       const timer = setTimeout(() => {
         setEffectiveness(null);
-      }, 2000 / animationSpeed);
+      }, 2000 / speedFactor);
       return () => clearTimeout(timer);
     }
-  }, [effectiveness, animationSpeed]);
+  }, [effectiveness, speedFactor]);
 
   // Commentary based on overall battle state (close match, one more hit, heating up)
   useEffect(() => {
@@ -468,17 +474,19 @@ export function BattleArena() {
       {effectiveness !== null && effectiveness !== 1 && (
         <EffectivenessIndicator
           effectiveness={effectiveness}
-          speedMultiplier={animationSpeed}
+            speedMultiplier={speedFactor}
         />
       )}
 
       {/* Battle View */}
       <div className="grid gap-6 lg:grid-cols-3 relative" ref={battleViewRef}>
-        <BattleCommentary
-          message={commentary}
-          speedMultiplier={animationSpeed}
-          onHide={() => setCommentary(null)}
-        />
+        {COMMENTARY_ENABLED && (
+          <BattleCommentary
+            message={showIntro ? null : commentary}
+            speedMultiplier={speedFactor}
+            onHide={() => setCommentary(null)}
+          />
+        )}
         {/* Type Particles - rendered here for proper positioning */}
         {pokemon1Attacking && pokemon1AttackType && (
           <TypeParticles
@@ -487,7 +495,7 @@ export function BattleArena() {
             toPosition="right"
             containerWidth={battleViewDimensions.width}
             containerHeight={battleViewDimensions.height}
-            speedMultiplier={animationSpeed}
+            speedMultiplier={speedFactor}
           />
         )}
         {pokemon2Attacking && pokemon2AttackType && (
@@ -497,7 +505,7 @@ export function BattleArena() {
             toPosition="left"
             containerWidth={battleViewDimensions.width}
             containerHeight={battleViewDimensions.height}
-            speedMultiplier={animationSpeed}
+            speedMultiplier={speedFactor}
           />
         )}
         {/* Critical hit star burst overlay */}
@@ -535,7 +543,7 @@ export function BattleArena() {
                 setPokemon1PreviousHP(undefined);
                 setPokemon1CriticalHit(false);
               }}
-              speedMultiplier={animationSpeed}
+              speedMultiplier={speedFactor}
             />
           )}
         </div>
@@ -582,8 +590,10 @@ export function BattleArena() {
             onReplay={battleSeed !== null ? handleReplay : undefined}
             isAutoPlaying={isAutoPlaying}
             canReplay={battleSeed !== null && selectedPokemon1 !== null && selectedPokemon2 !== null}
-            animationSpeed={animationSpeed}
-            onSpeedChange={setAnimationSpeed}
+        animationSpeed={animationSpeed}
+        onSpeedChange={setAnimationSpeed}
+        cinematicEnabled={cinematicModeEnabled}
+        onToggleCinematic={setCinematicModeEnabled}
           />
         </div>
 
@@ -611,7 +621,7 @@ export function BattleArena() {
                 setPokemon2PreviousHP(undefined);
                 setPokemon2CriticalHit(false);
               }}
-              speedMultiplier={animationSpeed}
+              speedMultiplier={speedFactor}
             />
           )}
         </div>
